@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Configuración del sistema de referidos por tenant
+model ReferralSettings {
+  id                     String   @id @default(cuid())
+  tenantId               String   @unique
+  tenantDomain           String   @unique
+  
+  // Comisiones programables
+  installationCommission Decimal  @db.Decimal(10,2) @default(500.00)
+  monthlyCommission      Decimal  @db.Decimal(10,2) @default(50.00)
+  commissionMonths       Int      @default(6)
+  
+  // Configuración
+  enabled                Boolean  @default(true)
+  requireDocuments       Boolean  @default(true)
+  autoApplyToInvoice     Boolean  @default(true)
+  minInstallationDays    Int      @default(30) // Días mínimos para considerar instalación válida
+  
+  // Campos informativos
+  companyName            String?
+  contactEmail           String?
+  contactPhone           String?
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@index([tenantId])
+}
+
+// Registro de referidos
+model Referral {
+  id                String          @id @default(cuid())
+  tenantId          String
+  
+  // Cliente referidor (quien recomienda)
+  referrerId        String          // ID del cliente en WispChat
+  referrerName      String
+  referrerEmail     String
+  referrerPhone     String?
+  
+  // Cliente referido (nuevo cliente)
+  name              String
+  email             String
+  phone             String
+  address           String
+  city              String?
+  state             String?
+  zipCode           String?
+  notes             String?         @db.Text
+  
+  // Status del proceso
+  status            ReferralStatus  @default(PENDING)
+  rejectionReason   String?         @db.Text
+  
+  // Documentos
+  documents         Document[]
+  
+  // Instalación
+  installation      Installation?
+  
+  // Comisiones
+  commissions       Commission[]
+  
+  // Tracking
+  shareUrl          String          @unique // URL única para compartir (ej: abc123xyz)
+  clickCount        Int             @default(0)
+  lastClickAt       DateTime?
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([tenantId])
+  @@index([referrerId])
+  @@index([status])
+  @@index([shareUrl])
+}
+
+enum ReferralStatus {
+  PENDING              // Esperando documentos
+  DOCUMENTS_UPLOADED   // Documentos subidos
+  IN_REVIEW            // En revisión
+  APPROVED             // Aprobado para instalación
+  SCHEDULED            // Instalación agendada
+  INSTALLED            // Instalado y activo
+  REJECTED             // Rechazado
+  CANCELLED            // Cancelado
+}
+
+// Documentos subidos
+model Document {
+  id            String       @id @default(cuid())
+  referralId    String
+  referral      Referral     @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  
+  type          DocumentType
+  filename      String
+  originalName  String
+  fileUrl       String       // Ruta local o URL cloudinary
+  fileSize      Int
+  mimeType      String
+  
+  uploadedAt    DateTime     @default(now())
+  
+  @@index([referralId])
+}
+
+enum DocumentType {
+  INE              // Identificación oficial
+  PROOF_ADDRESS    // Comprobante domicilio
+  CONTRACT         // Contrato firmado
+  OTHER            // Otros documentos
+}
+
+// Instalaciones
+model Installation {
+  id                String             @id @default(cuid())
+  referralId        String             @unique
+  referral          Referral           @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  
+  // Datos instalación
+  scheduledDate     DateTime?
+  installedDate     DateTime?
+  installedBy       String?            // Nombre del técnico
+  installerNotes    String?            @db.Text
+  
+  // Cliente en sistema principal
+  clientId          String?            // ID del cliente en WispChat
+  wispHubClientId   String?            // ID en WispHub si aplica
+  
+  status            InstallationStatus @default(PENDING)
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  @@index([referralId])
+  @@index([status])
+}
+
+enum InstallationStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Comisiones generadas
+model Commission {
+  id                String           @id @default(cuid())
+  referralId        String
+  referral          Referral         @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  
+  type              CommissionType
+  amount            Decimal          @db.Decimal(10,2)
+  
+  // Para comisiones mensuales
+  paymentNumber     Int?             // 1-6 para pagos mensuales
+  paymentDate       DateTime?        // Fecha del pago del cliente referido
+  
+  status            CommissionStatus @default(PENDING)
+  
+  // Aplicación a factura del referidor
+  appliedToInvoice  Boolean          @default(false)
+  invoiceId         String?          // ID factura WispChat del referidor
+  appliedDate       DateTime?
+  appliedAmount     Decimal?         @db.Decimal(10,2)
+  
+  // Notas
+  notes             String?          @db.Text
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  @@index([referralId])
+  @@index([status])
+  @@index([type])
+}
+
+enum CommissionType {
+  INSTALLATION     // Comisión por instalación completada
+  MONTHLY          // Comisión mensual (1-6)
+}
+
+enum CommissionStatus {
+  PENDING          // Pendiente de generar
+  EARNED           // Ganada (cliente referido pagó)
+  APPLIED          // Aplicada a factura del referidor
+  PAID             // Pagada directamente
+  CANCELLED        // Cancelada (cliente referido canceló)
+  EXPIRED          // Expirada (no aplicada a tiempo)
+}
