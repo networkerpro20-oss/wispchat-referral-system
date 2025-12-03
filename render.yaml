@@ -1,0 +1,39 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: wispchat-referral-db
+    env: docker
+    plan: free
+    region: oregon
+    databases:
+      - name: wispchat_referral
+        user: wispchat_referral_user
+
+  # Backend API
+  - type: web
+    name: wispchat-referral-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wispchat-referral-db
+          property: connectionString
+      - key: WISPCHAT_API_URL
+        value: https://wispchat-backend.onrender.com
+      - key: WISPCHAT_JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://referidos-wispchat.vercel.app
+      - key: ALLOWED_ORIGINS
+        value: https://referidos-wispchat.vercel.app,https://wispchat.net
+      - key: UPLOAD_DIR
+        value: /opt/render/project/src/uploads
