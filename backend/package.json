@@ -14,7 +14,11 @@
     "seed": "ts-node prisma/seed.ts",
     "sync:clients": "ts-node scripts/sync-clients.ts"
   },
-  "keywords": ["referral", "commissions", "wispchat"],
+  "keywords": [
+    "referral",
+    "commissions",
+    "wispchat"
+  ],
   "author": "WispChat Team",
   "license": "MIT",
   "dependencies": {
@@ -33,7 +37,7 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^1.4.12",
-    "@types/node": "^22.10.1",
+    "@types/node": "^22.19.1",
     "nodemon": "^3.1.9",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
