@@ -12,6 +12,19 @@ class Database {
 
   // User operations
   saveUser(user) {
+    // Check for referral code collision
+    if (this.referralCodeIndex.has(user.referralCode)) {
+      // Regenerate referral code if collision occurs
+      const crypto = require('crypto');
+      const prefix = 'EA';
+      user.referralCode = `${prefix}-${crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase()}`;
+      
+      // Recursively check until we get a unique code (extremely unlikely to loop)
+      if (this.referralCodeIndex.has(user.referralCode)) {
+        return this.saveUser(user);
+      }
+    }
+    
     this.users.set(user.id, user);
     this.referralCodeIndex.set(user.referralCode, user.id);
     this.emailIndex.set(user.email.toLowerCase(), user.id);

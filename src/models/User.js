@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 class User {
   constructor(name, email, phone) {
@@ -16,7 +17,7 @@ class User {
 
   generateReferralCode() {
     const prefix = 'EA'; // Easy Access
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const random = crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase();
     return `${prefix}-${random}`;
   }
 

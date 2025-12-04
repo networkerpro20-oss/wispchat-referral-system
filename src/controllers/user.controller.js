@@ -18,6 +18,22 @@ class UserController {
         });
       }
 
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          error: 'Invalid email format'
+        });
+      }
+
+      // Validate phone format (basic validation for + and numbers)
+      const phoneRegex = /^\+?[\d\s-()]+$/;
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({
+          error: 'Invalid phone format. Use numbers, spaces, dashes, or parentheses'
+        });
+      }
+
       // Check if user already exists
       if (db.getUserByEmail(email)) {
         return res.status(409).json({
@@ -28,9 +44,14 @@ class UserController {
       // Create new user
       const user = new User(name, email, phone);
 
-      // If referral code is provided, link the referrer
+      // If referral code is provided, validate and link the referrer
       if (referralCode) {
         const referrer = db.getUserByReferralCode(referralCode);
+        if (!referrer) {
+          return res.status(400).json({
+            error: 'Invalid referral code'
+          });
+        }
         if (referrer) {
           user.referredBy = referrer.id;
           
