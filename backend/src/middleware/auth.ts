@@ -5,7 +5,7 @@ import { config } from '../config';
 export interface JWTPayload {
   userId: string;
   email: string;
-  role: string;
+  rol: string;  // ← CAMBIO: "rol" (sin "e") como en WispChat
   tenantId: string;
   tenantDomain: string;
 }
@@ -30,7 +30,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     req.user = {
       id: decoded.userId,
       email: decoded.email,
-      role: decoded.role,
+      role: decoded.rol,  // ← CAMBIO: usar "rol" del token pero mantener "role" en req.user
       tenantId: decoded.tenantId,
       tenantDomain: decoded.tenantDomain,
     };
