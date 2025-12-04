@@ -371,7 +371,7 @@ curl https://wispchat-referral-backend.onrender.com/health
 ✅ Debe responder: `{"status":"ok"}`
 
 ### Test 2: Frontend Accesible
-Abrir: https://referidos-wispchat.vercel.app
+Abrir: https://referidos.wispchat.net
 ✅ Debe cargar landing page
 
 ### Test 3: Botón en WispChat
@@ -405,7 +405,7 @@ e02217d - feat: integrate referral system with WispChat
 ## 🎯 URLS FINALES
 
 ### Producción
-- **Frontend:** https://referidos-wispchat.vercel.app
+- **Frontend:** https://referidos.wispchat.net
 - **Backend:** https://wispchat-referral-backend.onrender.com
 - **Health:** https://wispchat-referral-backend.onrender.com/health
 
@@ -457,7 +457,7 @@ e02217d - feat: integrate referral system with WispChat
 - [ ] Deploy en Vercel (config lista)
 - [ ] Tests en producción
 - [ ] Panel de admin adicional (Fase 2)
-- [ ] Dominio personalizado (referidos.wispchat.net)
+- [ ] Dominio personalizado (referidos.wispchat.app)
 
 ---
 

@@ -50,8 +50,8 @@ PORT=10000
 DATABASE_URL=<PEGAR_INTERNAL_DATABASE_URL>
 WISPCHAT_API_URL=https://wispchat-backend.onrender.com
 WISPCHAT_JWT_SECRET=wispchat-secret-key-2024-ultra-secure
-FRONTEND_URL=https://referidos-wispchat.vercel.app
-ALLOWED_ORIGINS=https://referidos-wispchat.vercel.app,https://wispchat.net
+FRONTEND_URL=https://referidos.wispchat.net
+ALLOWED_ORIGINS=https://referidos.wispchat.net,https://wispchat.app
 UPLOAD_DIR=/opt/render/project/src/uploads
 ```
 
@@ -110,12 +110,12 @@ NEXT_PUBLIC_API_URL=https://wispchat-referral-backend.onrender.com
 
 1. Click "Deploy"
 2. Esperar a que termine el build (~2-3 minutos)
-3. Obtener URL: `https://referidos-wispchat.vercel.app`
+3. Obtener URL: `https://referidos.wispchat.net`
 
 ### 3.4 Configurar Dominio Custom (Opcional)
 
 1. En Vercel, ir a "Settings" → "Domains"
-2. Agregar: `referidos.wispchat.net`
+2. Agregar: `referidos.wispchat.app`
 3. Configurar DNS en tu proveedor:
    - Type: `CNAME`
    - Name: `referidos`
@@ -136,7 +136,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 
 ### 4.2 Test Frontend
 
-1. Visitar: `https://referidos-wispchat.vercel.app`
+1. Visitar: `https://referidos.wispchat.net`
 2. Verificar que carga correctamente
 3. Click "Ingresar" → debería ir a `/dashboard`
 4. Generar enlace de referido
@@ -147,7 +147,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 1. **Cliente genera enlace:**
    - Login en WispChat → Dashboard Referidos
    - Click "Generar Enlace Único"
-   - Copiar URL: `https://referidos-wispchat.vercel.app/register/abc123`
+   - Copiar URL: `https://referidos.wispchat.net/register/abc123`
 
 2. **Referido se registra:**
    - Abrir el enlace
@@ -199,7 +199,7 @@ import { Gift } from 'lucide-react';
 
 // Dentro del sidebar, agregar:
 <Link
-  href="https://referidos.wispchat.net/dashboard"
+  href="https://referidos.wispchat.app/dashboard"
   target="_blank"
   className="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 rounded-lg transition"
 >
@@ -294,7 +294,7 @@ await notifyReferralSystem(payment);
 
 ## URLs de Producción
 
-- **Frontend:** https://referidos-wispchat.vercel.app
+- **Frontend:** https://referidos.wispchat.net
 - **Backend API:** https://wispchat-referral-backend.onrender.com
 - **Health Check:** https://wispchat-referral-backend.onrender.com/health
 
@@ -307,8 +307,8 @@ PORT=10000
 DATABASE_URL=<from-render-postgresql>
 WISPCHAT_API_URL=https://wispchat-backend.onrender.com
 WISPCHAT_JWT_SECRET=wispchat-secret-key-2024-ultra-secure
-FRONTEND_URL=https://referidos-wispchat.vercel.app
-ALLOWED_ORIGINS=https://referidos-wispchat.vercel.app,https://wispchat.net
+FRONTEND_URL=https://referidos.wispchat.net
+ALLOWED_ORIGINS=https://referidos.wispchat.net,https://wispchat.app
 UPLOAD_DIR=/opt/render/project/src/uploads
 ```
 

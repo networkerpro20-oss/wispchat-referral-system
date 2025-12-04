@@ -215,7 +215,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 FRONTEND_URL=http://localhost:3001
 
 # CORS
-ALLOWED_ORIGINS=http://localhost:3001,https://referidos.wispchat.net
+ALLOWED_ORIGINS=http://localhost:3001,https://referidos.wispchat.app
 ```
 
 ### Frontend (.env.local)
@@ -235,7 +235,7 @@ El sistema usa **JWT tokens** compartidos con WispChat:
   email: "cliente@ejemplo.com",
   role: "client|admin|staff",
   tenantId: "wispchat",
-  tenantDomain: "wispchat.net"
+  tenantDomain: "wispchat.app"
 }
 ```
 
@@ -252,7 +252,7 @@ Authorization: Bearer <token>
 ```
 Cliente ingresa a /dashboard
 → Click "Generar Enlace Único"
-→ Obtiene: https://referidos.wispchat.net/register/abc123xyz
+→ Obtiene: https://referidos.wispchat.app/register/abc123xyz
 → Comparte por WhatsApp/redes sociales
 ```
 
@@ -312,7 +312,7 @@ Agregar botón en el chat para abrir sistema de referidos:
 <Button
   onClick={() => {
     const token = localStorage.getItem('token');
-    const url = `https://referidos.wispchat.net/dashboard?token=${token}`;
+    const url = `https://referidos.wispchat.app/dashboard?token=${token}`;
     window.open(url, '_blank');
   }}
 >
@@ -327,7 +327,7 @@ Cuando un cliente paga, enviar webhook:
 
 ```javascript
 // WispChat backend - después de confirmar pago
-await axios.post('https://referidos-api.wispchat.net/api/v1/webhooks/payment-received', {
+await axios.post('https://wispchat-referral-backend.onrender.com/api/v1/webhooks/payment-received', {
   tenantId: 'wispchat',
   clientId: cliente.id,
   wispHubClientId: cliente.wispHubClientId,
@@ -428,5 +428,5 @@ WispChat Team - 2025
 
 ---
 
-**URL Producción:** https://referidos.wispchat.net (por configurar)  
-**API Producción:** https://referidos-api.wispchat.net (por configurar)
+**URL Producción:** https://referidos.wispchat.app (por configurar)  
+**API Producción:** https://wispchat-referral-backend.onrender.com (por configurar)

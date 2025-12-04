@@ -22,7 +22,7 @@ El Sistema de Referidos se integra con WispChat en dos puntos principales:
 - Acceso: Solo para roles `admin` y `supervisor`
 - Acción: Abre el dashboard de referidos en nueva pestaña
 - Icono: 🎁 (regalo)
-- URL: `https://referidos-wispchat.vercel.app/dashboard`
+- URL: `https://referidos.wispchat.net/dashboard`
 
 ### 2. **Backend - Webhook de Pagos**
 - Trigger: Evento `invoice.payment_succeeded` de Stripe
@@ -48,7 +48,7 @@ if (userRole === 'admin' || userRole === 'supervisor') {
     
     // 🎁 NUEVO: Programa de Referidos
     { 
-      href: 'https://referidos-wispchat.vercel.app/dashboard', 
+      href: 'https://referidos.wispchat.net/dashboard', 
       label: 'Programa de Referidos', 
       icon: '🎁', 
       roles: ['admin', 'supervisor'], 
@@ -196,7 +196,7 @@ REFERRAL_WEBHOOK_URL="https://wispchat-referral-backend.onrender.com/api/v1/webh
 graph LR
     A[Admin/Supervisor] --> B[Click en Programa de Referidos]
     B --> C[Abre nueva pestaña]
-    C --> D[https://referidos-wispchat.vercel.app/dashboard]
+    C --> D[https://referidos.wispchat.net/dashboard]
     D --> E[Dashboard de Referidos]
     E --> F[JWT Token compartido valida sesión]
 ```
@@ -318,7 +318,7 @@ app.use(cors({
 4. Click en el botón
 
 **Resultado Esperado:**
-- Se abre nueva pestaña con `https://referidos-wispchat.vercel.app/dashboard`
+- Se abre nueva pestaña con `https://referidos.wispchat.net/dashboard`
 - Usuario está automáticamente autenticado (JWT compartido)
 - Dashboard muestra datos del usuario actual
 

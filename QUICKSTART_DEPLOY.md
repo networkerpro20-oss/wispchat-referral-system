@@ -87,7 +87,7 @@ git push -u origin main
    PORT=10000
    DATABASE_URL={PEGA_AQUI_INTERNAL_DATABASE_URL}
    JWT_SECRET=wispchat-secret-key-2024-ultra-secure
-   FRONTEND_URL=https://referidos-wispchat.vercel.app
+   FRONTEND_URL=https://referidos.wispchat.net
    ```
 
 5. Click **Create Web Service**
@@ -136,7 +136,7 @@ NEXT_PUBLIC_API_URL=https://wispchat-referral-backend.onrender.com/api/v1
 
 1. Click **Deploy**
 2. **Espera 3-5 minutos**
-3. URL final: `https://referidos-wispchat.vercel.app`
+3. URL final: `https://referidos.wispchat.net`
 
 ---
 
@@ -185,7 +185,7 @@ curl https://wispchat-referral-backend.onrender.com/health
 
 ### Test 2: Frontend Accesible
 
-1. Abre: https://referidos-wispchat.vercel.app
+1. Abre: https://referidos.wispchat.net
 2. Debe cargar la landing page
 3. Click en **Registrarse** → debe mostrar error (necesitas shareUrl válido)
 
@@ -407,7 +407,7 @@ Si ves este log, la integración funciona correctamente.
 **Solución:**
 ```bash
 # Verificar FRONTEND_URL en backend env
-# Debe incluir: https://referidos-wispchat.vercel.app
+# Debe incluir: https://referidos.wispchat.net
 # Redeploy backend en Render
 ```
 
@@ -426,7 +426,7 @@ Si ves este log, la integración funciona correctamente.
 ## 📞 URLs Finales
 
 ### Sistema de Referidos
-- **Frontend:** https://referidos-wispchat.vercel.app
+- **Frontend:** https://referidos.wispchat.net
 - **Backend API:** https://wispchat-referral-backend.onrender.com/api/v1
 - **Health Check:** https://wispchat-referral-backend.onrender.com/health
 
@@ -443,7 +443,7 @@ Si todos los tests pasan, el sistema está **100% funcional en producción**.
 ### Próximos Pasos Opcionales
 
 1. **Dominio Personalizado:**
-   - Configura `referidos.wispchat.net` en Vercel
+   - Configura `referidos.wispchat.app` en Vercel
    - Agrega DNS CNAME record
 
 2. **Alertas de Monitoreo:**

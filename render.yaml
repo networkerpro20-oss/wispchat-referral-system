@@ -32,8 +32,8 @@ services:
       - key: WISPCHAT_JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        value: https://referidos-wispchat.vercel.app
+        value: https://referidos-wispchat.app
       - key: ALLOWED_ORIGINS
-        value: https://referidos-wispchat.vercel.app,https://wispchat.net
+        value: https://referidos-wispchat.app,https://wispchat.app
       - key: UPLOAD_DIR
         value: /opt/render/project/src/uploads
