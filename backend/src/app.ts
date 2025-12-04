@@ -10,6 +10,7 @@ import documentRoutes from './routes/documents';
 import installationRoutes from './routes/installations';
 import commissionRoutes from './routes/commissions';
 import webhookRoutes from './routes/webhooks';
+import leadRoutes from './routes/leads';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/installations', installationRoutes);
 app.use('/api/v1/commissions', commissionRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
+app.use('/api/leads', leadRoutes); // Ruta pública para captura de leads
 
 // Error handler
 app.use(errorHandler);
