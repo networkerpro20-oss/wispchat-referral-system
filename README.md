@@ -118,6 +118,20 @@ POST /api/rewards/:id/redeem
 
 ## 💡 Ejemplos de Uso
 
+### Demostración Rápida
+
+Ejecute el script de demostración para ver el sistema en acción:
+
+```bash
+# Terminal 1: Iniciar el servidor
+npm start
+
+# Terminal 2: Ejecutar la demostración
+./demo.sh
+```
+
+El script de demostración creará usuarios, simulará referidos y mostrará estadísticas en tiempo real.
+
 ### Ejemplo 1: Registrar un nuevo usuario
 
 ```bash
