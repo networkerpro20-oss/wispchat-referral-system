@@ -25,7 +25,9 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'wispchat-secret-key-2024';
+// IMPORTANTE: Debe ser el MISMO secret que WispChat backend
+// WispChat usa: JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
 /**
  * Middleware que valida el token JWT de WispChat
@@ -43,6 +45,7 @@ export const authenticateToken = async (
     const token = authHeader?.replace('Bearer ', '') || tokenFromQuery;
 
     if (!token) {
+      console.log('[AUTH] ❌ No token provided');
       res.status(401).json({
         success: false,
         error: {
@@ -57,9 +60,16 @@ export const authenticateToken = async (
     let decoded: JWTPayload;
     
     try {
+      console.log('[AUTH] 🔍 Validating token with secret:', JWT_SECRET.substring(0, 20) + '...');
       decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      console.log('[AUTH] ✅ Token decoded successfully:', {
+        id: decoded.id,
+        email: decoded.email,
+        rol: decoded.rol
+      });
     } catch (error: any) {
-      console.error('[AUTH] Error verificando token:', error.message);
+      console.error('[AUTH] ❌ Token verification failed:', error.message);
+      console.error('[AUTH] Secret used:', JWT_SECRET.substring(0, 20) + '...');
       
       res.status(401).json({
         success: false,
@@ -73,6 +83,7 @@ export const authenticateToken = async (
 
     // 3. Verificar que el usuario tenga rol de admin o supervisor
     if (!['admin', 'supervisor'].includes(decoded.rol)) {
+      console.log('[AUTH] ❌ User role not allowed:', decoded.rol);
       res.status(403).json({
         success: false,
         error: {
@@ -94,7 +105,7 @@ export const authenticateToken = async (
 
     next();
   } catch (error: any) {
-    console.error('[AUTH] Error en middleware:', error);
+    console.error('[AUTH] ❌ Error en middleware:', error);
     
     res.status(500).json({
       success: false,
