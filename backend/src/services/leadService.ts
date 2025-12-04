@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { Referral, ReferralStatus } from '@prisma/client';
 import clientService from './clientService';
+import wispChatService from './wispChatService';
 
 /**
  * Servicio para manejar leads/referidos
@@ -46,7 +47,7 @@ class LeadService {
       include: {
         client: {
           select: {
-            wispHubClientId: true,
+            wispChatClientId: true,
             nombre: true,
             email: true,
           },
@@ -56,6 +57,8 @@ class LeadService {
 
     // Actualizar contador del cliente
     await clientService.updateStats(client.id);
+
+    console.log(`✅ Nuevo lead registrado: ${referral.nombre} por ${client.nombre}`);
 
     return referral;
   }
@@ -98,14 +101,13 @@ class LeadService {
         include: {
           client: {
             select: {
-              wispHubClientId: true,
+              wispChatClientId: true,
               nombre: true,
               email: true,
+              referralCode: true,
             },
           },
-          _count: {
-            select: { commissions: true },
-          },
+          commissions: true,
         },
       }),
       prisma.referral.count({ where }),
@@ -124,25 +126,54 @@ class LeadService {
 
   /**
    * Actualizar estado del lead
+   * Si se marca como INSTALLED, verificar en WispChat automáticamente
    */
   async updateStatus(
     id: string,
     status: ReferralStatus,
     data?: {
-      wispHubClientId?: string;
       fechaContacto?: Date;
       fechaInstalacion?: Date;
       notas?: string;
     }
   ): Promise<Referral> {
+    const referral = await this.getById(id);
+    if (!referral) throw new Error('Lead no encontrado');
+
     const updateData: any = { status };
 
     if (data?.fechaContacto) updateData.fechaContacto = data.fechaContacto;
     if (data?.fechaInstalacion) updateData.fechaInstalacion = data.fechaInstalacion;
-    if (data?.wispHubClientId) updateData.wispHubClientId = data.wispHubClientId;
     if (data?.notas) updateData.notas = data.notas;
 
-    const referral = await prisma.referral.update({
+    // Si se marca como INSTALLED, verificar en WispChat
+    if (status === 'INSTALLED') {
+      console.log(`🔍 Verificando referido en WispChat: ${referral.nombre}`);
+      
+      const wispChatClient = await wispChatService.findClientByEmailOrPhone(
+        referral.email || undefined,
+        referral.telefono
+      );
+
+      if (wispChatClient) {
+        console.log(`✅ Referido encontrado en WispChat: ${wispChatClient.clientNumber}`);
+        updateData.wispChatClientId = wispChatClient.id;
+        
+        if (!data?.fechaInstalacion) {
+          updateData.fechaInstalacion = new Date();
+        }
+
+        // Generar comisión de instalación
+        await this.generateInstallationCommission(referral, wispChatClient.id);
+      } else {
+        console.log(`⚠️  Referido NO encontrado en WispChat - verificar manualmente`);
+        throw new Error(
+          'Referido no encontrado en WispChat. Verificar que el email/teléfono coincidan con el registro en el sistema.'
+        );
+      }
+    }
+
+    const updated = await prisma.referral.update({
       where: { id },
       data: updateData,
       include: {
@@ -150,25 +181,20 @@ class LeadService {
       },
     });
 
-    // Si se marca como INSTALLED, generar comisión de instalación
-    if (status === 'INSTALLED' && data?.fechaInstalacion) {
-      await this.generateInstallationCommission(referral);
-    }
-
     // Actualizar stats del cliente
-    await clientService.updateStats(referral.clientId);
+    await clientService.updateStats(updated.clientId);
 
-    return referral;
+    return updated;
   }
 
   /**
    * Generar comisión de instalación
    */
-  private async generateInstallationCommission(referral: Referral) {
+  private async generateInstallationCommission(referral: Referral, wispChatClientId: string) {
     const settings = await prisma.settings.findFirst();
     const amount = settings?.installationAmount || 500;
 
-    await prisma.commission.create({
+    const commission = await prisma.commission.create({
       data: {
         clientId: referral.clientId,
         referralId: referral.id,
@@ -177,6 +203,8 @@ class LeadService {
         status: 'EARNED',
       },
     });
+
+    console.log(`💰 Comisión de instalación generada: $${amount} (${commission.id})`);
 
     await clientService.updateStats(referral.clientId);
   }

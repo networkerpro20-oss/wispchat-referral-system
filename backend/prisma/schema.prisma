@@ -7,24 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Cliente referidor - sincronizado desde WispHub
+// Cliente referidor - Auto-registro desde WispChat
 model Client {
   id                String          @id @default(cuid())
   
-  // Datos del cliente en WispHub (solo consulta)
-  wispHubClientId   String          @unique // Número de cliente en WispHub
+  // Datos del cliente en WispChat (sincronizados en auto-registro)
+  wispChatClientId  String          @unique // ID del cliente en WispChat (ej: 8, 53, 55)
+  wispChatUserId    String?         // ID del usuario en WispChat (si tiene cuenta)
   nombre            String
-  email             String
+  email             String          @unique
   telefono          String?
   
   // Código único de referido
   referralCode      String          @unique // Código para compartir (ej: EASY-12345)
   shareUrl          String          @unique // URL completa: /easyaccess/EASY-12345
   
+  // Estado de pagos (actualizado desde CSV)
+  lastInvoiceStatus InvoiceStatus?  // Estado de su última factura (PAID/PENDING)
+  lastInvoiceDate   DateTime?       // Fecha de su última factura procesada
+  isPaymentCurrent  Boolean         @default(true) // ¿Está al día con sus pagos?
+  
   // Estadísticas
   totalReferrals    Int             @default(0)
-  totalEarned       Decimal         @db.Decimal(10,2) @default(0)
-  totalApplied      Decimal         @db.Decimal(10,2) @default(0)
+  totalEarned       Decimal         @db.Decimal(10,2) @default(0) // Total ganado
+  totalActive       Decimal         @db.Decimal(10,2) @default(0) // Total activo (puede cobrar)
+  totalApplied      Decimal         @db.Decimal(10,2) @default(0) // Total ya cobrado
   
   // Referidos que ha generado
   referrals         Referral[]
@@ -37,8 +44,10 @@ model Client {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   
-  @@index([wispHubClientId])
+  @@index([wispChatClientId])
+  @@index([email])
   @@index([referralCode])
+  @@index([isPaymentCurrent])
 }
 
 // Lead/Referido - persona que llegó por link
@@ -63,10 +72,14 @@ model Referral {
   // Estado del proceso
   status            ReferralStatus  @default(PENDING)
   
-  // Instalación
+  // Instalación (cuando se convierte en cliente de WispChat)
   fechaContacto     DateTime?       // Cuándo se contactó
   fechaInstalacion  DateTime?       // Cuándo se instaló
-  wispHubClientId   String?         // ID cuando se convierte en cliente
+  wispChatClientId  String?         // ID en WispChat cuando se convierte en cliente (ej: 77, 84, 96)
+  
+  // Estado de pagos del referido (actualizado desde CSV)
+  lastInvoiceStatus InvoiceStatus?  // Estado de su última factura
+  lastInvoiceDate   DateTime?       // Fecha de su última factura procesada
   
   // Comisiones generadas
   commissions       Commission[]
@@ -79,13 +92,15 @@ model Referral {
   
   @@index([clientId])
   @@index([status])
-  @@index([wispHubClientId])
+  @@index([email])
+  @@index([telefono])
+  @@index([wispChatClientId])
 }
 
 enum ReferralStatus {
   PENDING           // Lead registrado, pendiente de contactar
   CONTACTED         // Contactado por admin
-  INSTALLED         // Ya instalado (es cliente en WispHub)
+  INSTALLED         // Ya instalado (es cliente en WispChat)
   REJECTED          // Sin cobertura o rechazado
 }
 
@@ -107,10 +122,13 @@ model Commission {
   
   // Para comisiones mensuales (mes 1-6)
   monthNumber       Int?
-  monthDate         DateTime?        // Qué mes se pagó en WispHub
+  monthDate         DateTime?        // Fecha de la factura pagada del referido
   
-  // Estado
+  // Estado mejorado
   status            CommissionStatus @default(EARNED)
+  
+  // Razón si está en espera o cancelada
+  statusReason      String?          // Ej: "Cliente referidor no está al día", "Referido canceló servicio"
   
   // Aplicación a factura
   applications      CommissionApplication[]
@@ -133,9 +151,10 @@ enum CommissionType {
 }
 
 enum CommissionStatus {
-  EARNED            // Ganada pero no aplicada
-  APPLIED           // Aplicada total o parcialmente
-  CANCELLED         // Cancelada (cliente referido canceló servicio)
+  EARNED            // Ganada (referido pagó) pero cliente referidor NO está al día
+  ACTIVE            // Activa (referido pagó Y cliente está al día) - PUEDE COBRAR
+  APPLIED           // Aplicada total o parcialmente a factura
+  CANCELLED         // Cancelada (referido canceló servicio)
 }
 
 // Registro de aplicación de comisión a factura
@@ -149,8 +168,8 @@ model CommissionApplication {
   // Detalles de la aplicación
   amount            Decimal          @db.Decimal(10,2) // Cuánto se descontó
   
-  // Factura de WispHub donde se aplicó
-  wispHubInvoiceId  String          // ID de la factura en WispHub
+  // Factura de WispChat donde se aplicó
+  wispChatInvoiceId String          // ID de la factura en WispChat
   invoiceMonth      String          // Ej: "Enero 2025"
   invoiceAmount     Decimal         @db.Decimal(10,2) // Total de la factura
   
@@ -162,6 +181,87 @@ model CommissionApplication {
   notas             String?         @db.Text
   
   @@index([commissionId])
+  @@index([wispChatInvoiceId])
+}
+
+// Carga de CSV de facturas (día 7 y 21)
+model InvoiceUpload {
+  id                String           @id @default(cuid())
+  
+  // Archivo CSV
+  fileName          String
+  filePath          String          // Ruta en servidor
+  fileUrl           String?         // URL para descargar
+  
+  // Período
+  uploadDate        DateTime        @default(now())
+  periodStart       DateTime        // Inicio del período (últimos 20 días)
+  periodEnd         DateTime        // Fin del período
+  
+  // Estadísticas
+  totalInvoices     Int             @default(0) // Total de facturas en CSV
+  paidInvoices      Int             @default(0) // Facturas pagadas
+  pendingInvoices   Int             @default(0) // Facturas pendientes
+  
+  // Procesamiento
+  processed         Boolean         @default(false)
+  processedAt       DateTime?
+  commissionsGenerated Int          @default(0) // Comisiones mensuales generadas
+  commissionsActivated Int          @default(0) // Comisiones activadas (cliente al día)
+  
+  // Datos parseados del CSV
+  invoices          InvoiceRecord[]
+  
+  // Quién lo subió
+  uploadedBy        String          // Admin que subió el archivo
+  
+  // Notas
+  notas             String?         @db.Text
+  
+  createdAt         DateTime        @default(now())
+  
+  @@index([uploadDate])
+  @@index([processed])
+}
+
+// Registro individual de factura del CSV
+model InvoiceRecord {
+  id                String           @id @default(cuid())
+  
+  // Upload al que pertenece
+  uploadId          String
+  upload            InvoiceUpload    @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  
+  // Datos de la factura (del CSV Easy Access)
+  wispChatClientId  String          // ID del cliente en WispChat (8, 53, 55, etc.)
+  wispChatInvoiceId String          // Número de factura (#Factura)
+  clientName        String
+  invoiceDate       DateTime
+  dueDate           DateTime
+  amount            Decimal         @db.Decimal(10,2)
+  status            InvoiceStatus   // PAID o PENDING
+  
+  // Clasificación
+  isReferrer        Boolean         @default(false) // ¿Es un cliente referidor?
+  isReferral        Boolean         @default(false) // ¿Es un referido instalado?
+  
+  // Referido asociado (si existe)
+  matchedReferralId String?
+  
+  createdAt         DateTime        @default(now())
+  
+  @@index([uploadId])
+  @@index([wispChatClientId])
+  @@index([wispChatInvoiceId])
+  @@index([status])
+  @@index([matchedReferralId])
+  @@index([isReferrer])
+  @@index([isReferral])
+}
+
+enum InvoiceStatus {
+  PAID              // Factura pagada
+  PENDING           // Factura pendiente
 }
 
 // Configuración global del sistema
@@ -173,9 +273,13 @@ model Settings {
   monthlyAmount         Decimal  @db.Decimal(10,2) @default(50.00)
   monthsToEarn          Int      @default(6)
   
-  // WispHub API
-  wispHubUrl            String?
-  wispHubApiKey         String?
+  // WispChat API
+  wispChatUrl           String   @default("https://wispchat-backend.onrender.com")
+  wispChatTenantDomain  String   @default("easyaccessnet.com")
+  
+  // Credenciales de admin para WispChat API
+  wispChatAdminEmail    String?
+  wispChatAdminPassword String?
   
   // Email notifications
   notificationEmail     String?

@@ -1,173 +1,190 @@
 import prisma from '../lib/prisma';
-import { Client } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
- * Servicio para manejar clientes referidores
- * Los clientes se sincronizan desde WispHub
+ * Auto-registro de cliente desde WispChat
+ * Llamado cuando el usuario presiona "Promociona y Gana" en /chat
  */
-class ClientService {
-  /**
-   * Crear o actualizar un cliente desde WispHub
-   */
-  async syncFromWispHub(data: {
-    wispHubClientId: string;
-    nombre: string;
-    email: string;
-    telefono?: string;
-  }): Promise<Client> {
-    // Generar código único de referido
-    const referralCode = this.generateReferralCode(data.wispHubClientId);
-    const shareUrl = `/easyaccess/${referralCode}`;
+async function autoRegisterFromWispChat(data: {
+  wispChatClientId: string;
+  wispChatUserId?: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+}) {
+  // Verificar si ya existe
+  const existing = await prisma.client.findUnique({
+    where: { wispChatClientId: data.wispChatClientId },
+  });
 
-    return await prisma.client.upsert({
-      where: { wispHubClientId: data.wispHubClientId },
-      update: {
-        nombre: data.nombre,
-        email: data.email,
-        telefono: data.telefono,
-      },
-      create: {
-        wispHubClientId: data.wispHubClientId,
-        nombre: data.nombre,
-        email: data.email,
-        telefono: data.telefono,
-        referralCode,
-        shareUrl,
-        active: true,
-      },
-    });
+  if (existing) {
+    return existing;
   }
 
-  /**
-   * Obtener cliente por ID de WispHub
-   */
-  async getByWispHubId(wispHubClientId: string): Promise<Client | null> {
-    return await prisma.client.findUnique({
-      where: { wispHubClientId },
-      include: {
-        referrals: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-        commissions: {
-          where: { status: 'EARNED' },
-        },
-      },
-    });
-  }
+  // Generar código único EASY-XXXXX
+  const codigo = await generateUniqueCode();
+  const shareUrl = `${process.env.FRONTEND_URL || 'https://referidos.wispchat.net'}/easyaccess/${codigo}`;
 
-  /**
-   * Obtener cliente por código de referido
-   */
-  async getByReferralCode(referralCode: string): Promise<Client | null> {
-    return await prisma.client.findUnique({
-      where: { referralCode },
-    });
-  }
+  // Crear cliente
+  const client = await prisma.client.create({
+    data: {
+      wispChatClientId: data.wispChatClientId,
+      wispChatUserId: data.wispChatUserId,
+      nombre: data.nombre,
+      email: data.email,
+      telefono: data.telefono,
+      referralCode: codigo,
+      shareUrl,
+    },
+  });
 
-  /**
-   * Obtener estadísticas del cliente
-   */
-  async getClientStats(clientId: string) {
-    const [totalReferrals, referralsByStatus, commissionStats] = await Promise.all([
-      prisma.referral.count({
-        where: { clientId },
-      }),
-      prisma.referral.groupBy({
-        by: ['status'],
-        where: { clientId },
-        _count: true,
-      }),
-      prisma.commission.aggregate({
-        where: { clientId },
-        _sum: { amount: true },
-        _count: true,
-      }),
-    ]);
-
-    const totalEarned = await prisma.commission.aggregate({
-      where: { clientId, status: { in: ['EARNED', 'APPLIED'] } },
-      _sum: { amount: true },
-    });
-
-    const totalApplied = await prisma.commissionApplication.aggregate({
-      where: {
-        commission: { clientId },
-      },
-      _sum: { amount: true },
-    });
-
-    return {
-      totalReferrals,
-      referralsByStatus: referralsByStatus.reduce((acc, item) => {
-        acc[item.status] = item._count;
-        return acc;
-      }, {} as Record<string, number>),
-      totalEarned: Number(totalEarned._sum.amount || 0),
-      totalApplied: Number(totalApplied._sum.amount || 0),
-      pendingBalance: Number(totalEarned._sum.amount || 0) - Number(totalApplied._sum.amount || 0),
-    };
-  }
-
-  /**
-   * Listar todos los clientes activos
-   */
-  async listActive(page: number = 1, limit: number = 50) {
-    const skip = (page - 1) * limit;
-
-    const [clients, total] = await Promise.all([
-      prisma.client.findMany({
-        where: { active: true },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-        include: {
-          _count: {
-            select: {
-              referrals: true,
-              commissions: true,
-            },
-          },
-        },
-      }),
-      prisma.client.count({ where: { active: true } }),
-    ]);
-
-    return {
-      clients,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  /**
-   * Actualizar estadísticas del cliente
-   */
-  async updateStats(clientId: string) {
-    const stats = await this.getClientStats(clientId);
-
-    await prisma.client.update({
-      where: { id: clientId },
-      data: {
-        totalReferrals: stats.totalReferrals,
-        totalEarned: stats.totalEarned,
-        totalApplied: stats.totalApplied,
-      },
-    });
-  }
-
-  /**
-   * Generar código único de referido
-   */
-  private generateReferralCode(wispHubClientId: string): string {
-    // Formato: EASY-XXXXX
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    return `EASY-${randomNum}`;
-  }
+  console.log(`✅ Cliente auto-registrado: ${client.nombre} (${codigo})`);
+  return client;
 }
 
-export default new ClientService();
+/**
+ * Generar código único EASY-XXXXX
+ */
+async function generateUniqueCode(): Promise<string> {
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    const randomNum = Math.floor(10000 + Math.random() * 90000); // 5 dígitos
+    const codigo = `EASY-${randomNum}`;
+
+    // Verificar que no exista
+    const exists = await prisma.client.findUnique({
+      where: { referralCode: codigo },
+    });
+
+    if (!exists) {
+      return codigo;
+    }
+
+    attempts++;
+  }
+
+  throw new Error('No se pudo generar código único después de 10 intentos');
+}
+
+/**
+ * Obtener cliente por wispChatClientId
+ */
+async function getByWispChatId(wispChatClientId: string) {
+  const client = await prisma.client.findUnique({
+    where: { wispChatClientId },
+    include: {
+      referrals: {
+        orderBy: { createdAt: 'desc' },
+      },
+      commissions: {
+        include: {
+          referral: true,
+          applications: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
+
+  if (!client) {
+    throw new Error('Cliente no encontrado');
+  }
+
+  return client;
+}
+
+/**
+ * Obtener cliente por código de referido
+ */
+async function getByReferralCode(codigo: string) {
+  const client = await prisma.client.findUnique({
+    where: { referralCode: codigo },
+  });
+
+  if (!client) {
+    throw new Error('Código de referido no válido');
+  }
+
+  return client;
+}
+
+/**
+ * Obtener estadísticas del cliente
+ */
+async function getClientStats(clientId: string) {
+  const [client, commissions] = await Promise.all([
+    prisma.client.findUnique({
+      where: { id: clientId },
+      include: {
+        referrals: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.commission.findMany({
+      where: { clientId },
+      include: {
+        applications: true,
+      },
+    }),
+  ]);
+
+  if (!client) {
+    throw new Error('Cliente no encontrado');
+  }
+
+  // Calcular totales
+  const totalEarned = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
+  
+  const totalApplied = commissions.reduce((sum, c) => {
+    const applied = c.applications.reduce((appSum, app) => appSum + Number(app.amount), 0);
+    return sum + applied;
+  }, 0);
+
+  const pendingBalance = totalEarned - totalApplied;
+
+  // Contar referidos por estado
+  const referralsByStatus = {
+    pending: client.referrals.filter((r) => r.status === 'PENDING').length,
+    contacted: client.referrals.filter((r) => r.status === 'CONTACTED').length,
+    installed: client.referrals.filter((r) => r.status === 'INSTALLED').length,
+    rejected: client.referrals.filter((r) => r.status === 'REJECTED').length,
+  };
+
+  return {
+    totalReferrals: client.totalReferrals,
+    referralsByStatus,
+    totalEarned,
+    totalApplied,
+    pendingBalance,
+  };
+}
+
+/**
+ * Actualizar contadores del cliente
+ */
+async function updateStats(clientId: string) {
+  const stats = await getClientStats(clientId);
+
+  await prisma.client.update({
+    where: { id: clientId },
+    data: {
+      totalReferrals: stats.totalReferrals,
+      totalEarned: new Decimal(stats.totalEarned),
+      totalApplied: new Decimal(stats.totalApplied),
+    },
+  });
+}
+
+export default {
+  autoRegisterFromWispChat,
+  generateUniqueCode,
+  getByWispChatId,
+  getByReferralCode,
+  getClientStats,
+  updateStats,
+};

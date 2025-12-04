@@ -153,7 +153,7 @@ class CommissionService {
         include: {
           client: {
             select: {
-              wispHubClientId: true,
+              wispChatClientId: true,
               nombre: true,
               email: true,
             },
@@ -186,7 +186,7 @@ class CommissionService {
   async applyToInvoice(data: {
     commissionId: string;
     amount: number;
-    wispHubInvoiceId: string;
+    wispChatInvoiceId: string;
     invoiceMonth: string;
     invoiceAmount: number;
     appliedBy: string;
@@ -218,7 +218,7 @@ class CommissionService {
       data: {
         commissionId: data.commissionId,
         amount: new Decimal(data.amount),
-        wispHubInvoiceId: data.wispHubInvoiceId,
+        wispChatInvoiceId: data.wispChatInvoiceId,
         invoiceMonth: data.invoiceMonth,
         invoiceAmount: new Decimal(data.invoiceAmount),
         appliedBy: data.appliedBy,

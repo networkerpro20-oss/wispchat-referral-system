@@ -2,13 +2,43 @@ import { Request, Response } from 'express';
 import commissionService from '../services/commissionService';
 import clientService from '../services/clientService';
 import leadService from '../services/leadService';
-import wispHubService from '../services/wispHubService';
+import invoiceService from '../services/invoiceService';
 import prisma from '../lib/prisma';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs/promises';
 
-/**
- * Controlador para panel de administración
- */
+// Configuración de multer para uploads de CSV
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/invoices');
+    await fs.mkdir(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `invoices-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/plain' || file.mimetype === 'text/csv' || file.originalname.endsWith('.txt')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos .txt o .csv'));
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB máximo
+});
+
 class AdminController {
+  /**
+   * Middleware de multer para upload
+   */
+  uploadMiddleware = upload.single('file');
+
   /**
    * Dashboard: resumen general
    * GET /api/admin/dashboard
@@ -20,197 +50,285 @@ class AdminController {
         totalLeads,
         pendingLeads,
         installedLeads,
-        pendingCommissions,
+        activeCommissions,
+        earnedCommissions,
         totalEarned,
+        totalActive,
         totalApplied,
       ] = await Promise.all([
         prisma.client.count({ where: { active: true } }),
         prisma.referral.count(),
         prisma.referral.count({ where: { status: 'PENDING' } }),
         prisma.referral.count({ where: { status: 'INSTALLED' } }),
+        prisma.commission.count({ where: { status: 'ACTIVE' } }),
         prisma.commission.count({ where: { status: 'EARNED' } }),
         prisma.commission.aggregate({
-          where: { status: { in: ['EARNED', 'APPLIED'] } },
           _sum: { amount: true },
         }),
-        prisma.commissionApplication.aggregate({
+        prisma.commission.aggregate({
+          where: { status: 'ACTIVE' },
+          _sum: { amount: true },
+        }),
+        prisma.commission.aggregate({
+          where: { status: 'APPLIED' },
           _sum: { amount: true },
         }),
       ]);
 
-      return res.json({
+      res.json({
         success: true,
         data: {
-          clients: {
-            total: totalClients,
-          },
+          clients: { total: totalClients },
           leads: {
             total: totalLeads,
             pending: pendingLeads,
             installed: installedLeads,
           },
           commissions: {
-            pending: pendingCommissions,
-            totalEarned: Number(totalEarned._sum.amount || 0),
-            totalApplied: Number(totalApplied._sum.amount || 0),
-            pendingAmount: Number(totalEarned._sum.amount || 0) - Number(totalApplied._sum.amount || 0),
+            active: activeCommissions,
+            earned: earnedCommissions,
+            totalEarned: Number(totalEarned._sum.amount) || 0,
+            totalActive: Number(totalActive._sum.amount) || 0,
+            totalApplied: Number(totalApplied._sum.amount) || 0,
           },
         },
       });
     } catch (error: any) {
-      console.error('Error getting dashboard:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }
 
   /**
-   * Listar todos los clientes
-   * GET /api/admin/clients
+   * Listar leads con filtros
+   * GET /api/admin/leads
    */
-  async listClients(req: Request, res: Response) {
+  async listLeads(req: Request, res: Response) {
     try {
-      const { page, limit } = req.query;
+      const { status, page, limit } = req.query;
 
-      const result = await clientService.listActive(
-        page ? parseInt(page as string) : 1,
-        limit ? parseInt(limit as string) : 50
-      );
+      const result = await leadService.list({
+        status: status as any,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
 
-      return res.json({
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Actualizar estado de lead
+   * PUT /api/admin/leads/:id/status
+   */
+  async updateLeadStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status, notas } = req.body;
+
+      const referral = await leadService.updateStatus(id, status, { notas });
+
+      res.json({
         success: true,
-        data: result.clients,
-        pagination: result.pagination,
+        data: referral,
       });
     } catch (error: any) {
-      console.error('Error listing clients:', error);
-      return res.status(500).json({
+      res.status(400).json({
         success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }
 
   /**
-   * Sincronizar cliente desde WispHub
-   * POST /api/admin/clients/sync
+   * Subir CSV de facturas
+   * POST /api/admin/invoices/upload
    */
-  async syncClient(req: Request, res: Response) {
+  async uploadInvoicesCSV(req: Request, res: Response) {
     try {
-      const { wispHubClientId } = req.body;
-
-      if (!wispHubClientId) {
+      if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: 'El campo wispHubClientId es requerido',
+          error: { message: 'No se subió ningún archivo' },
         });
       }
 
-      // Obtener datos desde WispHub
-      const wispHubClient = await wispHubService.getClient(wispHubClientId);
+      const { periodStart, periodEnd, uploadedBy } = req.body;
 
-      if (!wispHubClient) {
+      if (!periodStart || !periodEnd || !uploadedBy) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Faltan campos requeridos: periodStart, periodEnd, uploadedBy' },
+        });
+      }
+
+      const result = await invoiceService.processCSV({
+        filePath: req.file.path,
+        fileName: req.file.originalname,
+        uploadedBy,
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Listar uploads de CSV
+   * GET /api/admin/invoices/uploads
+   */
+  async listInvoiceUploads(req: Request, res: Response) {
+    try {
+      const { processed, page, limit } = req.query;
+
+      const result = await invoiceService.listUploads({
+        processed: processed === 'true' ? true : processed === 'false' ? false : undefined,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Ver detalles de un upload específico
+   * GET /api/admin/invoices/uploads/:id
+   */
+  async getUploadDetails(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const upload = await invoiceService.getUploadDetails(id);
+
+      if (!upload) {
         return res.status(404).json({
           success: false,
-          message: 'Cliente no encontrado en WispHub',
+          error: { message: 'Upload no encontrado' },
         });
       }
 
-      // Sincronizar en nuestro sistema
-      const client = await clientService.syncFromWispHub({
-        wispHubClientId,
-        nombre: wispHubClient.name || wispHubClient.nombre,
-        email: wispHubClient.email,
-        telefono: wispHubClient.phone || wispHubClient.telefono,
-      });
-
-      return res.json({
-        success: true,
-        message: 'Cliente sincronizado correctamente',
-        data: client,
-      });
+      res.json({ success: true, data: upload });
     } catch (error: any) {
-      console.error('Error syncing client:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }
 
   /**
-   * Listar comisiones pendientes
-   * GET /api/admin/commissions/pending
+   * Reprocesar un upload (para corregir errores)
+   * POST /api/admin/invoices/uploads/:id/reprocess
    */
-  async getPendingCommissions(req: Request, res: Response) {
+  async reprocessUpload(req: Request, res: Response) {
     try {
-      const { page, limit } = req.query;
+      const { id } = req.params;
+      const stats = await invoiceService.reprocessUpload(id);
 
-      const result = await commissionService.getPendingCommissions(
-        page ? parseInt(page as string) : 1,
-        limit ? parseInt(limit as string) : 50
-      );
-
-      return res.json({
+      res.json({
         success: true,
-        data: result.commissions,
-        pagination: result.pagination,
+        data: stats,
       });
     } catch (error: any) {
-      console.error('Error getting pending commissions:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }
 
   /**
-   * Aplicar comisión a factura
+   * Listar comisiones pendientes de aplicar
+   * GET /api/admin/commissions/active
+   */
+  async getActiveCommissions(req: Request, res: Response) {
+    try {
+      const commissions = await prisma.commission.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          client: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              wispChatClientId: true,
+            },
+          },
+          referral: {
+            select: {
+              id: true,
+              nombre: true,
+              wispChatClientId: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      res.json({ success: true, data: commissions });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Aplicar comisión a factura del cliente
    * POST /api/admin/commissions/:id/apply
    */
   async applyCommission(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const {
-        amount,
-        wispHubInvoiceId,
-        invoiceMonth,
-        invoiceAmount,
-        appliedBy,
-        notas,
-      } = req.body;
+      const { wispChatInvoiceId, invoiceMonth, invoiceAmount, appliedBy, amount, notas } = req.body;
 
-      // Validar campos requeridos
-      if (!amount || !wispHubInvoiceId || !invoiceMonth || !invoiceAmount || !appliedBy) {
+      if (!wispChatInvoiceId || !invoiceMonth || !invoiceAmount || !appliedBy) {
         return res.status(400).json({
           success: false,
-          message: 'Faltan campos requeridos',
+          error: { message: 'Faltan campos requeridos' },
         });
       }
 
       const application = await commissionService.applyToInvoice({
         commissionId: id,
-        amount: parseFloat(amount),
-        wispHubInvoiceId,
+        wispChatInvoiceId,
         invoiceMonth,
         invoiceAmount: parseFloat(invoiceAmount),
         appliedBy,
+        amount: amount ? parseFloat(amount) : parseFloat(invoiceAmount),
         notas,
       });
 
-      return res.json({
+      res.json({
         success: true,
-        message: 'Comisión aplicada correctamente',
         data: application,
       });
     } catch (error: any) {
-      console.error('Error applying commission:', error);
-      return res.status(500).json({
+      res.status(400).json({
         success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }
@@ -224,92 +342,16 @@ class AdminController {
       const { id } = req.params;
       const { reason } = req.body;
 
-      if (!reason) {
-        return res.status(400).json({
-          success: false,
-          message: 'El campo reason es requerido',
-        });
-      }
-
       const commission = await commissionService.cancelCommission(id, reason);
 
-      return res.json({
+      res.json({
         success: true,
-        message: 'Comisión cancelada correctamente',
         data: commission,
       });
     } catch (error: any) {
-      console.error('Error cancelling commission:', error);
-      return res.status(500).json({
+      res.status(400).json({
         success: false,
-        message: error.message,
-      });
-    }
-  }
-
-  /**
-   * Generar comisión mensual manualmente
-   * POST /api/admin/commissions/generate-monthly
-   */
-  async generateMonthlyCommission(req: Request, res: Response) {
-    try {
-      const { referralId, monthNumber, monthDate } = req.body;
-
-      if (!referralId || !monthNumber || !monthDate) {
-        return res.status(400).json({
-          success: false,
-          message: 'Faltan campos requeridos: referralId, monthNumber, monthDate',
-        });
-      }
-
-      const commission = await commissionService.generateMonthlyCommission(
-        referralId,
-        parseInt(monthNumber),
-        new Date(monthDate)
-      );
-
-      return res.json({
-        success: true,
-        message: 'Comisión mensual generada correctamente',
-        data: commission,
-      });
-    } catch (error: any) {
-      console.error('Error generating monthly commission:', error);
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
-
-  /**
-   * Verificar cliente en WispHub
-   * GET /api/admin/wisphub/clients/:clientId
-   */
-  async checkWispHubClient(req: Request, res: Response) {
-    try {
-      const { clientId } = req.params;
-
-      const exists = await wispHubService.clientExists(clientId);
-
-      if (!exists) {
-        return res.status(404).json({
-          success: false,
-          message: 'Cliente no encontrado en WispHub',
-        });
-      }
-
-      const client = await wispHubService.getClient(clientId);
-
-      return res.json({
-        success: true,
-        data: client,
-      });
-    } catch (error: any) {
-      console.error('Error checking WispHub client:', error);
-      return res.status(500).json({
-        success: false,
-        message: error.message,
+        error: { message: error.message },
       });
     }
   }

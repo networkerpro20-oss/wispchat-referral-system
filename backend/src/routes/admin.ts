@@ -10,26 +10,50 @@ const router = Router();
 router.get('/dashboard', adminController.getDashboard);
 
 /**
- * GET /api/admin/clients
- * Listar todos los clientes
+ * GET /api/admin/leads
+ * Listar leads (referidos)
  */
-router.get('/clients', adminController.listClients);
+router.get('/leads', adminController.listLeads);
 
 /**
- * POST /api/admin/clients/sync
- * Sincronizar cliente desde WispHub
+ * PUT /api/admin/leads/:id/status
+ * Actualizar estado de lead
  */
-router.post('/clients/sync', adminController.syncClient);
+router.put('/leads/:id/status', adminController.updateLeadStatus);
 
 /**
- * GET /api/admin/commissions/pending
- * Listar comisiones pendientes de aplicar
+ * POST /api/admin/invoices/upload
+ * Subir CSV de facturas (días 7 y 21)
  */
-router.get('/commissions/pending', adminController.getPendingCommissions);
+router.post('/invoices/upload', adminController.uploadMiddleware, adminController.uploadInvoicesCSV);
+
+/**
+ * GET /api/admin/invoices/uploads
+ * Listar uploads de CSV
+ */
+router.get('/invoices/uploads', adminController.listInvoiceUploads);
+
+/**
+ * GET /api/admin/invoices/uploads/:id
+ * Ver detalles de un upload específico
+ */
+router.get('/invoices/uploads/:id', adminController.getUploadDetails);
+
+/**
+ * POST /api/admin/invoices/uploads/:id/reprocess
+ * Reprocesar un upload
+ */
+router.post('/invoices/uploads/:id/reprocess', adminController.reprocessUpload);
+
+/**
+ * GET /api/admin/commissions/active
+ * Listar comisiones ACTIVE (listas para aplicar)
+ */
+router.get('/commissions/active', adminController.getActiveCommissions);
 
 /**
  * POST /api/admin/commissions/:id/apply
- * Aplicar comisión a factura
+ * Aplicar comisión a factura del cliente
  */
 router.post('/commissions/:id/apply', adminController.applyCommission);
 
@@ -38,17 +62,5 @@ router.post('/commissions/:id/apply', adminController.applyCommission);
  * Cancelar comisión
  */
 router.post('/commissions/:id/cancel', adminController.cancelCommission);
-
-/**
- * POST /api/admin/commissions/generate-monthly
- * Generar comisión mensual manualmente
- */
-router.post('/commissions/generate-monthly', adminController.generateMonthlyCommission);
-
-/**
- * GET /api/admin/wisphub/clients/:clientId
- * Verificar cliente en WispHub
- */
-router.get('/wisphub/clients/:clientId', adminController.checkWispHubClient);
 
 export default router;

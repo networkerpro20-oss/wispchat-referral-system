@@ -15,7 +15,7 @@ class ClientController {
     try {
       const { wispHubId } = req.params;
 
-      const client = await clientService.getByWispHubId(wispHubId);
+      const client = await clientService.getByWispChatId(wispHubId);
 
       if (!client) {
         return res.status(404).json({
@@ -45,7 +45,7 @@ class ClientController {
     try {
       const { wispHubId } = req.params;
 
-      const client = await clientService.getByWispHubId(wispHubId);
+      const client = await clientService.getByWispChatId(wispHubId);
       if (!client) {
         return res.status(404).json({
           success: false,
@@ -77,7 +77,7 @@ class ClientController {
       const { wispHubId } = req.params;
       const { status, type } = req.query;
 
-      const client = await clientService.getByWispHubId(wispHubId);
+      const client = await clientService.getByWispChatId(wispHubId);
       if (!client) {
         return res.status(404).json({
           success: false,
@@ -115,7 +115,7 @@ class ClientController {
     try {
       const { wispHubId } = req.params;
 
-      const client = await clientService.getByWispHubId(wispHubId);
+      const client = await clientService.getByWispChatId(wispHubId);
       if (!client) {
         return res.status(404).json({
           success: false,
@@ -132,7 +132,7 @@ class ClientController {
         success: true,
         data: {
           client: {
-            wispHubClientId: client.wispHubClientId,
+            wispChatClientId: client.wispChatClientId,
             nombre: client.nombre,
             email: client.email,
             referralCode: client.referralCode,
@@ -159,7 +159,7 @@ class ClientController {
     try {
       const { wispHubId } = req.params;
 
-      const client = await clientService.getByWispHubId(wispHubId);
+      const client = await clientService.getByWispChatId(wispHubId);
       if (!client) {
         return res.status(404).json({
           success: false,
