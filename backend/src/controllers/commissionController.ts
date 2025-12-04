@@ -1,13 +1,19 @@
 import { Request, Response } from 'express';
 import { commissionService } from '../services/commissionService';
-import { CommissionType, CommissionStatus } from '@prisma/client';
+import { wispHubService } from '../services/wispHubService';
+import { installationService } from '../services/installationService';
 
 export class CommissionController {
-  // Obtener mis comisiones
-  async getMyCommissions(req: Request, res: Response) {
+  // Obtener todas las comisiones de un tenant
+  async getAllCommissions(req: Request, res: Response) {
     try {
-      const { tenantId, id: userId } = req.user!;
-      const commissions = await commissionService.getMyCommissions(tenantId, userId);
+      const { tenantId } = req.params;
+      const { status, referralId } = req.query;
+
+      const commissions = await commissionService.getAllCommissions(tenantId, {
+        status: status as any,
+        referralId: referralId as string,
+      });
 
       res.json({
         success: true,
@@ -21,90 +27,57 @@ export class CommissionController {
     }
   }
 
-  // Generar comisión por instalación (Admin/Webhook)
-  async generateInstallationCommission(req: Request, res: Response) {
+  // Verificar manualmente si cliente pagó y generar comisión
+  async checkPaymentAndGenerateCommission(req: Request, res: Response) {
     try {
-      const { referralId } = req.params;
-      const commission = await commissionService.generateInstallationCommission(referralId);
+      const { installationId } = req.params;
 
-      res.status(201).json({
-        success: true,
-        data: commission,
-        message: 'Installation commission generated',
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
+      // Obtener instalación
+      const installation = await installationService.getInstallationById(installationId);
 
-  // Generar comisión mensual (Webhook)
-  async generateMonthlyCommission(req: Request, res: Response) {
-    try {
-      const { referralId } = req.params;
-      const { paymentNumber, paymentDate } = req.body;
-
-      const commission = await commissionService.generateMonthlyCommission(
-        referralId,
-        paymentNumber,
-        new Date(paymentDate)
-      );
-
-      if (!commission) {
-        return res.status(400).json({
+      if (!installation || !installation.wispHubClientId) {
+        return res.status(404).json({
           success: false,
-          message: 'Commission not generated (payment number exceeds limit)',
+          message: 'Installation not found or missing WispHub client ID',
         });
       }
 
-      res.status(201).json({
-        success: true,
-        data: commission,
-        message: 'Monthly commission generated',
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
+      // Verificar si el cliente pagó
+      const hasPaid = await wispHubService.clientHasPaid(installation.wispHubClientId);
 
-  // Aplicar comisión a factura (Admin)
-  async applyToInvoice(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { invoiceId, appliedAmount } = req.body;
+      if (!hasPaid) {
+        return res.json({
+          success: false,
+          message: 'Client has pending invoices',
+        });
+      }
 
-      const commission = await commissionService.applyToInvoice(id, invoiceId, appliedAmount);
+      // Obtener comisiones existentes
+      const existingCommissions = await commissionService.getCommissionsByReferral(
+        installation.referralId
+      );
+      const monthlyCommissions = existingCommissions.filter(c => c.type === 'MONTHLY');
+      
+      // Verificar si ya alcanzó el límite (6 pagos)
+      if (monthlyCommissions.length >= 6) {
+        return res.json({
+          success: false,
+          message: 'Commission limit reached (6 monthly payments)',
+        });
+      }
 
-      res.json({
-        success: true,
-        data: commission,
-        message: 'Commission applied to invoice',
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
-
-  // Cancelar comisión (Admin)
-  async cancelCommission(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-
-      const commission = await commissionService.cancelCommission(id, reason);
+      // Generar comisión mensual
+      const nextPaymentNumber = monthlyCommissions.length + 1;
+      const commission = await commissionService.generateMonthlyCommission(
+        installation.referralId,
+        nextPaymentNumber,
+        new Date()
+      );
 
       res.json({
         success: true,
         data: commission,
-        message: 'Commission cancelled',
+        message: `Monthly commission #${nextPaymentNumber} generated`,
       });
     } catch (error: any) {
       res.status(500).json({
@@ -114,20 +87,74 @@ export class CommissionController {
     }
   }
 
-  // Obtener todas las comisiones (Admin)
-  async getAllCommissions(req: Request, res: Response) {
+  // Aplicar comisión a cuenta del cliente (EARNED → APPLIED)
+  async applyCommission(req: Request, res: Response) {
     try {
-      const { tenantId } = req.user!;
-      const { status, type } = req.query;
+      const { commissionId } = req.params;
+      const { appliedToInvoice } = req.body;
+
+      const commission = await commissionService.applyCommission(
+        commissionId,
+        appliedToInvoice
+      );
+
+      res.json({
+        success: true,
+        data: commission,
+        message: 'Commission applied successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // Editar comisión manualmente (admin)
+  async updateCommission(req: Request, res: Response) {
+    try {
+      const { commissionId } = req.params;
+      const { amount, status, notes } = req.body;
+
+      const commission = await commissionService.updateCommission(commissionId, {
+        amount,
+        status,
+        notes,
+      });
+
+      res.json({
+        success: true,
+        data: commission,
+        message: 'Commission updated successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // Obtener resumen de comisiones pendientes por aplicar
+  async getPendingBalance(req: Request, res: Response) {
+    try {
+      const { tenantId, referrerId } = req.params;
 
       const commissions = await commissionService.getAllCommissions(tenantId, {
-        status: status as CommissionStatus,
-        type: type as CommissionType,
+        status: 'EARNED',
+        referralId: referrerId,
       });
+
+      const totalPending = commissions.reduce((sum, c) => sum + c.amount, 0);
 
       res.json({
         success: true,
-        data: commissions,
+        data: {
+          totalCommissions: commissions.length,
+          totalAmount: totalPending,
+          commissions,
+        },
       });
     } catch (error: any) {
       res.status(500).json({
@@ -137,15 +164,16 @@ export class CommissionController {
     }
   }
 
-  // Obtener resumen de comisiones (Admin)
-  async getCommissionsSummary(req: Request, res: Response) {
+  // Eliminar comisión (admin)
+  async deleteCommission(req: Request, res: Response) {
     try {
-      const { tenantId } = req.user!;
-      const summary = await commissionService.getCommissionsSummary(tenantId);
+      const { commissionId } = req.params;
+
+      await commissionService.deleteCommission(commissionId);
 
       res.json({
         success: true,
-        data: summary,
+        message: 'Commission deleted successfully',
       });
     } catch (error: any) {
       res.status(500).json({
