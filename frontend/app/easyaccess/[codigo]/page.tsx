@@ -177,14 +177,21 @@ export default function LandingPage() {
       const response = await fetch(`${API_URL}/referral-codes/${referralCode}/validate`);
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.data) {
         setValidCode(true);
-        setReferrerName(data.data.referrerName);
+        setReferrerName(data.data.referrerName || 'un cliente Easy Access');
       } else {
-        toast.error('Código de referido no válido');
+        // Si el endpoint no existe o no hay datos, seguir mostrando la página
+        // El código se usará para el registro del lead
+        setValidCode(true);
+        setReferrerName('un cliente Easy Access');
+        console.log('Usando modo fallback para código:', referralCode);
       }
     } catch (error) {
       console.error('Error validating code:', error);
+      // En caso de error, también permitir continuar
+      setValidCode(true);
+      setReferrerName('un cliente Easy Access');
     } finally {
       setLoading(false);
     }
