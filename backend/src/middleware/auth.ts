@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { User } from '../types/express';
 
 export interface JWTPayload {
   userId: string;
   email: string;
-  rol: string;  // ← CAMBIO: "rol" (sin "e") como en WispChat
+  rol: string;  // WispChat usa "rol" (sin "e")
   tenantId: string;
   tenantDomain: string;
 }
@@ -26,14 +27,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Verificar token
     const decoded = jwt.verify(token, config.wispchatJwtSecret) as JWTPayload;
 
-    // Agregar usuario al request
+    // Agregar usuario al request (convertir rol → role)
     req.user = {
       id: decoded.userId,
       email: decoded.email,
-      role: decoded.rol,  // ← CAMBIO: usar "rol" del token pero mantener "role" en req.user
+      role: decoded.rol,  // ← Leer "rol" del token, asignar como "role"
       tenantId: decoded.tenantId,
       tenantDomain: decoded.tenantDomain,
-    };
+    } as User;  // ← Cast explícito para evitar error TS
 
     next();
   } catch (error: any) {
