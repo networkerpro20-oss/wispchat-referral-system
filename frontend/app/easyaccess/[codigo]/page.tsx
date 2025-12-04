@@ -1,445 +1,1013 @@
 'use client';
 
-import { useState, use } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  Wifi,
+  Zap,
+  Shield,
+  Clock,
+  CheckCircle,
+  Star,
+  Users,
+  TrendingUp,
+  MapPin,
+  Phone,
+  Mail,
+  MessageCircle,
+  Send,
+  Sparkles,
+  DollarSign,
+  Award,
+  Loader2,
+  ExternalLink
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
-interface LeadFormData {
-  nombre: string;
-  telefono: string;
-  email: string;
-  direccion: string;
-  colonia: string;
-  ciudad: string;
-  codigoPostal: string;
-  servicioInteres: string;
-  velocidadInteres: string;
-  comentarios: string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com/api';
+
+interface Plan {
+  name: string;
+  speed: string;
+  price: number;
+  features: string[];
+  popular?: boolean;
 }
 
-export default function LandingPage({ params }: { params: Promise<{ codigo: string }> }) {
-  const resolvedParams = use(params);
-  const [step, setStep] = useState<'cobertura' | 'formulario' | 'documentos' | 'confirmacion'>('cobertura');
-  const [formData, setFormData] = useState<LeadFormData>({
-    nombre: '',
-    telefono: '',
-    email: '',
-    direccion: '',
-    colonia: '',
-    ciudad: '',
-    codigoPostal: '',
-    servicioInteres: 'residencial',
-    velocidadInteres: '',
-    comentarios: '',
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+const plans: Plan[] = [
+  {
+    name: 'Básico',
+    speed: '20 Mbps',
+    price: 299,
+    features: [
+      'Ideal para navegación',
+      '2-3 dispositivos',
+      'Streaming SD',
+      'Redes sociales',
+      'Correo electrónico'
+    ]
+  },
+  {
+    name: 'Hogar',
+    speed: '50 Mbps',
+    price: 449,
+    popular: true,
+    features: [
+      'Perfecto para familias',
+      '4-6 dispositivos',
+      'Streaming HD',
+      'Gaming casual',
+      'Videollamadas',
+      'Home office'
+    ]
+  },
+  {
+    name: 'Premium',
+    speed: '100 Mbps',
+    price: 599,
+    features: [
+      'Máxima velocidad',
+      '8+ dispositivos',
+      'Streaming 4K',
+      'Gaming profesional',
+      'Smart home',
+      'Múltiples usuarios'
+    ]
+  }
+];
 
-  const handleCoberturaSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const nombre = (form.elements.namedItem('nombre') as HTMLInputElement).value;
-    const telefono = (form.elements.namedItem('telefono') as HTMLInputElement).value;
-    
-    if (!nombre || !telefono) {
-      setError('Por favor completa todos los campos');
+const benefits = [
+  {
+    icon: Zap,
+    title: 'Velocidad Garantizada',
+    description: 'Conexión estable y rápida las 24 horas del día'
+  },
+  {
+    icon: Shield,
+    title: 'Seguridad Incluida',
+    description: 'Protección contra amenazas en línea sin costo extra'
+  },
+  {
+    icon: Clock,
+    title: 'Soporte 24/7',
+    description: 'Atención técnica inmediata cuando lo necesites'
+  },
+  {
+    icon: Award,
+    title: 'Sin Permanencia',
+    description: 'Cancela cuando quieras sin penalizaciones'
+  }
+];
+
+const testimonials = [
+  {
+    name: 'María González',
+    role: 'Empresaria',
+    content: 'Excelente servicio! La velocidad es constante y el soporte técnico responde muy rápido. 100% recomendado.',
+    rating: 5,
+    avatar: 'MG'
+  },
+  {
+    name: 'Carlos Ramírez',
+    role: 'Diseñador Gráfico',
+    content: 'Trabajo desde casa y necesitaba internet confiable. Easy Access superó mis expectativas, nunca se cae.',
+    rating: 5,
+    avatar: 'CR'
+  },
+  {
+    name: 'Ana Martínez',
+    role: 'Estudiante',
+    content: 'Perfecto para clases en línea y streaming. Mis hermanos y yo usamos internet al mismo tiempo sin problemas.',
+    rating: 5,
+    avatar: 'AM'
+  }
+];
+
+const problems = [
+  {
+    problem: '🐌 Internet lento que no cumple lo prometido',
+    solution: '✅ Velocidad real garantizada, no "hasta"'
+  },
+  {
+    problem: '📞 Soporte técnico que nunca responde',
+    solution: '✅ Atención 24/7 por WhatsApp, Telegram y chat'
+  },
+  {
+    problem: '💸 Cobros ocultos y sorpresas en la factura',
+    solution: '✅ Precio fijo, sin costos ocultos'
+  },
+  {
+    problem: '🔒 Contratos con permanencia forzada',
+    solution: '✅ Sin ataduras, cancela cuando quieras'
+  }
+];
+
+export default function LandingPage() {
+  const params = useParams();
+  const router = useRouter();
+  const referralCode = params.codigo as string;
+
+  const [loading, setLoading] = useState(true);
+  const [validCode, setValidCode] = useState(false);
+  const [referrerName, setReferrerName] = useState('');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [checkingCoverage, setCheckingCoverage] = useState(false);
+
+  // Form data
+  const [formData, setFormData] = useState({
+    ciudad: '',
+    colonia: '',
+    codigoPostal: '',
+    nombre: '',
+    email: '',
+    telefono: '',
+    calle: '',
+    numeroExterior: '',
+    numeroInterior: '',
+    referencias: '',
+    planSeleccionado: 'Hogar'
+  });
+
+  useEffect(() => {
+    validateReferralCode();
+  }, [referralCode]);
+
+  const validateReferralCode = async () => {
+    try {
+      const response = await fetch(`${API_URL}/referral-codes/${referralCode}/validate`);
+      const data = await response.json();
+
+      if (data.success) {
+        setValidCode(true);
+        setReferrerName(data.data.referrerName);
+      } else {
+        toast.error('Código de referido no válido');
+      }
+    } catch (error) {
+      console.error('Error validating code:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const checkCoverage = async () => {
+    if (!formData.codigoPostal || formData.codigoPostal.length < 5) {
+      toast.error('Por favor ingresa un código postal válido');
       return;
     }
+
+    setCheckingCoverage(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setCheckingCoverage(false);
     
-    setFormData(prev => ({ ...prev, nombre, telefono }));
-    setStep('formulario');
+    toast.success('¡Excelente! Tenemos cobertura en tu área');
+    setCurrentStep(2);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
 
+    if (currentStep === 1) {
+      checkCoverage();
+      return;
+    }
+
+    if (currentStep === 2) {
+      if (!formData.nombre || !formData.email || !formData.telefono) {
+        toast.error('Por favor completa todos los campos');
+        return;
+      }
+      setCurrentStep(3);
+      return;
+    }
+
+    if (currentStep === 3) {
+      if (!formData.calle || !formData.numeroExterior) {
+        toast.error('Por favor completa la dirección');
+        return;
+      }
+      setCurrentStep(4);
+      return;
+    }
+
+    // Submit final
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
-      const response = await fetch(`${apiUrl}/api/leads/register`, {
+      const response = await fetch(`${API_URL}/lead/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          codigoReferido: resolvedParams.codigo,
-        }),
+          referralCode,
+          ...formData
+        })
       });
 
-      if (!response.ok) {
-        throw new Error('Error al registrar el lead');
-      }
+      const data = await response.json();
 
-      setStep('confirmacion');
-    } catch (err) {
-      setError('Hubo un error al enviar tu información. Por favor intenta nuevamente.');
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+      if (data.success) {
+        toast.success('¡Registro exitoso! Nos contactaremos contigo pronto.');
+        setCurrentStep(5);
+      } else {
+        throw new Error(data.error?.message || 'Error al registrar');
+      }
+    } catch (error: any) {
+      console.error('Error submitting form:', error);
+      toast.error(error.message || 'Error al enviar el formulario');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-purple-600 to-indigo-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex justify-between items-center">
-            <div className="text-2xl font-bold">Easy Access NewTelecom</div>
-            <Link
-              href="/"
-              className="px-6 py-2 bg-white text-purple-600 rounded-full font-semibold hover:scale-105 transition-transform"
+  const contactWhatsApp = () => {
+    window.open('https://wa.me/5215512345678?text=Hola!%20Me%20interesa%20contratar%20Easy%20Access', '_blank');
+  };
+
+  const contactTelegram = () => {
+    window.open('https://t.me/easyaccesssoporte', '_blank');
+  };
+
+  const contactWispChat = () => {
+    window.open('https://wispchat.net/chat?user=ventas@easyaccessnet.com', '_blank');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!validCode && !loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">❌</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Código No Válido</h2>
+          <p className="text-gray-600 mb-6">
+            El código de referido <strong>{referralCode}</strong> no existe o ha expirado.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 5) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-12 h-12 text-green-600" />
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">¡Registro Exitoso!</h2>
+            <p className="text-gray-600">
+              Gracias por elegir Easy Access NewTelecom
+            </p>
+          </div>
+
+          <div className="bg-blue-50 rounded-xl p-6 mb-6">
+            <h3 className="font-semibold text-blue-900 mb-3">📋 Próximos Pasos:</h3>
+            <ol className="space-y-2 text-sm text-blue-800">
+              <li className="flex items-start gap-2">
+                <span className="font-bold">1.</span>
+                <span>Nuestro equipo verificará la cobertura en tu dirección</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-bold">2.</span>
+                <span>Te contactaremos en las próximas 24 horas</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-bold">3.</span>
+                <span>Agendaremos la instalación en la fecha que prefieras</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-bold">4.</span>
+                <span>¡Disfrutarás de internet rápido y confiable!</span>
+              </li>
+            </ol>
+          </div>
+
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
+            <h3 className="font-semibold text-emerald-900 mb-2">🎁 Beneficio por Referido</h3>
+            <p className="text-sm text-emerald-800">
+              Gracias a la referencia de <strong>{referrerName}</strong>, ambos recibirán beneficios especiales al activar el servicio.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-center text-gray-600 text-sm mb-4">
+              ¿Tienes dudas? Contáctanos ahora:
+            </p>
+            <button
+              onClick={contactWhatsApp}
+              className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
-              Inicio
-            </Link>
+              <MessageCircle className="w-5 h-5" />
+              WhatsApp
+            </button>
+            <button
+              onClick={contactTelegram}
+              className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <Send className="w-5 h-5" />
+              Telegram
+            </button>
+            <button
+              onClick={contactWispChat}
+              className="w-full px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Chat en Vivo (ventas@easyaccessnet.com)
+            </button>
           </div>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      {/* Hero Banner */}
-      <section className="bg-gradient-to-r from-purple-600 to-indigo-700 text-white py-12">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            🎉 ¡Te han recomendado con nosotros!
-          </h1>
-          <p className="text-xl md:text-2xl">
-            Internet de Alta Velocidad - Instalación Profesional - Soporte 24/7
-          </p>
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 text-white py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              {validCode && referrerName && (
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 mb-6 inline-block">
+                  <p className="text-sm text-blue-100">
+                    🎁 Invitado por <strong className="text-white">{referrerName}</strong>
+                  </p>
+                </div>
+              )}
+              
+              <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                Internet Ultra Rápido
+                <br />
+                <span className="text-yellow-300">Sin Ataduras</span>
+              </h1>
+              
+              <p className="text-xl text-blue-100 mb-8">
+                La mejor conexión para tu hogar y negocio. Planes desde <strong className="text-white">$299/mes</strong> con velocidad garantizada.
+              </p>
+
+              <div className="flex flex-wrap gap-4 mb-8">
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <Zap className="w-5 h-5 text-yellow-300" />
+                  <span>Instalación en 24hrs</span>
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <Shield className="w-5 h-5 text-green-300" />
+                  <span>Sin permanencia</span>
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <Clock className="w-5 h-5 text-blue-300" />
+                  <span>Soporte 24/7</span>
+                </div>
+              </div>
+
+              <a
+                href="#cobertura"
+                className="inline-block px-8 py-4 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+              >
+                Verificar Cobertura Ahora
+              </a>
+            </div>
+
+            <div>
+              {/* Video Institucional */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
+                  <div className="relative z-10 text-center">
+                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-white/30 transition-colors">
+                      <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+                    </div>
+                    <p className="text-white font-semibold">Ver Video Institucional</p>
+                    <p className="text-blue-100 text-sm mt-1">Conoce Easy Access NewTelecom</p>
+                  </div>
+                  {/* Para implementar video real:
+                  <iframe 
+                    src="https://www.youtube.com/embed/VIDEO_ID" 
+                    className="w-full h-full" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                  */}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Progress Indicator */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between">
-            <div className={`flex-1 text-center ${step === 'cobertura' ? 'text-purple-600 font-bold' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center mb-2 ${step === 'cobertura' ? 'bg-purple-600 text-white' : 'bg-gray-300'}`}>
-                1
-              </div>
-              <span className="text-sm">Cobertura</span>
-            </div>
-            <div className="flex-1 border-t-2 border-gray-300 mx-2 mt-[-20px]"></div>
-            <div className={`flex-1 text-center ${step === 'formulario' ? 'text-purple-600 font-bold' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center mb-2 ${step === 'formulario' ? 'bg-purple-600 text-white' : 'bg-gray-300'}`}>
-                2
-              </div>
-              <span className="text-sm">Tus Datos</span>
-            </div>
-            <div className="flex-1 border-t-2 border-gray-300 mx-2 mt-[-20px]"></div>
-            <div className={`flex-1 text-center ${step === 'confirmacion' ? 'text-purple-600 font-bold' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center mb-2 ${step === 'confirmacion' ? 'bg-purple-600 text-white' : 'bg-gray-300'}`}>
-                ✓
-              </div>
-              <span className="text-sm">Confirmación</span>
-            </div>
+      {/* Benefits Section */}
+      <section className="py-20 px-6 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              ¿Por Qué Elegir Easy Access?
+            </h2>
+            <p className="text-xl text-gray-600">
+              Más que internet, una experiencia completa
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {benefits.map((benefit, index) => {
+              const Icon = benefit.icon;
+              return (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1"
+                >
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mb-4">
+                    <Icon className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {benefit.title}
+                  </h3>
+                  <p className="text-gray-600">
+                    {benefit.description}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
+      </section>
 
-        {/* Step 1: Cobertura */}
-        {step === 'cobertura' && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
-            <div className="text-center mb-8">
-              <div className="text-6xl mb-4">📍</div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">
-                Verificación de Cobertura
-              </h2>
-              <p className="text-gray-600 text-lg">
-                Primero necesitamos saber tu nombre y teléfono para verificar si tenemos cobertura en tu zona
-              </p>
-            </div>
+      {/* Problems We Solve */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Problemas Que Resolvemos
+            </h2>
+            <p className="text-xl text-gray-600">
+              Dile adiós a las frustraciones del internet
+            </p>
+          </div>
 
-            <form onSubmit={handleCoberturaSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre Completo *
-                </label>
-                <input
-                  type="text"
-                  name="nombre"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  placeholder="Tu nombre completo"
-                />
+          <div className="space-y-6">
+            {problems.map((item, index) => (
+              <div
+                key={index}
+                className="bg-gradient-to-r from-red-50 to-green-50 border-2 border-gray-200 rounded-xl p-6 hover:border-green-400 transition-colors"
+              >
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">😤</span>
+                    <p className="text-gray-700 font-medium">{item.problem}</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">😊</span>
+                    <p className="text-green-700 font-semibold">{item.solution}</p>
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Teléfono WhatsApp *
-                </label>
-                <input
-                  type="tel"
-                  name="telefono"
-                  required
-                  pattern="[0-9]{10}"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  placeholder="10 dígitos sin espacios"
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  Lo utilizaremos para enviarte información por WhatsApp
+      {/* Plans Section */}
+      <section id="planes" className="py-20 px-6 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Planes Para Cada Necesidad
+            </h2>
+            <p className="text-xl text-gray-600">
+              Elige el plan perfecto para ti
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {plans.map((plan, index) => (
+              <div
+                key={index}
+                className={`bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all hover:scale-105 ${
+                  plan.popular ? 'ring-4 ring-purple-500 relative' : ''
+                }`}
+              >
+                {plan.popular && (
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center py-2 font-bold">
+                    <Sparkles className="w-4 h-4 inline mr-1" />
+                    MÁS POPULAR
+                  </div>
+                )}
+                
+                <div className="p-8">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    {plan.name}
+                  </h3>
+                  <div className="mb-6">
+                    <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
+                    <span className="text-gray-600">/mes</span>
+                  </div>
+                  <div className="text-3xl font-bold text-blue-600 mb-6 flex items-center gap-2">
+                    <Wifi className="w-8 h-8" />
+                    {plan.speed}
+                  </div>
+                  
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => {
+                      setFormData({ ...formData, planSeleccionado: plan.name });
+                      document.getElementById('cobertura')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      plan.popular
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                    }`}
+                  >
+                    Contratar Ahora
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Lo Que Dicen Nuestros Clientes
+            </h2>
+            <p className="text-xl text-gray-600">
+              Miles de familias confían en nosotros
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <div
+                key={index}
+                className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {testimonial.avatar}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">{testimonial.name}</h4>
+                    <p className="text-sm text-gray-600">{testimonial.role}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-1 mb-3">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+
+                <p className="text-gray-700 italic">
+                  "{testimonial.content}"
                 </p>
               </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-700 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:scale-105 transition-transform"
-              >
-                Continuar →
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Step 2: Formulario Completo */}
-        {step === 'formulario' && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
-            <div className="text-center mb-8">
-              <div className="text-6xl mb-4">📝</div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">
-                Completa tu Información
-              </h2>
-              <p className="text-gray-600 text-lg">
-                Necesitamos algunos datos más para preparar tu instalación
-              </p>
-            </div>
-
-            <form onSubmit={handleFormSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                    placeholder="tu@email.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ciudad *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.ciudad}
-                    onChange={(e) => setFormData({...formData, ciudad: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                    placeholder="Mérida, Yucatán"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dirección Completa *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.direccion}
-                  onChange={(e) => setFormData({...formData, direccion: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  placeholder="Calle, número, referencias"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Colonia/Fraccionamiento *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.colonia}
-                    onChange={(e) => setFormData({...formData, colonia: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                    placeholder="Nombre de tu colonia"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Código Postal *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    pattern="[0-9]{5}"
-                    value={formData.codigoPostal}
-                    onChange={(e) => setFormData({...formData, codigoPostal: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                    placeholder="5 dígitos"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Servicio *
-                </label>
-                <select
-                  required
-                  value={formData.servicioInteres}
-                  onChange={(e) => setFormData({...formData, servicioInteres: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                >
-                  <option value="residencial">Residencial</option>
-                  <option value="comercial">Comercial</option>
-                  <option value="empresarial">Empresarial</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Velocidad de Interés
-                </label>
-                <select
-                  value={formData.velocidadInteres}
-                  onChange={(e) => setFormData({...formData, velocidadInteres: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                >
-                  <option value="">Selecciona una opción</option>
-                  <option value="20mbps">20 Mbps</option>
-                  <option value="50mbps">50 Mbps</option>
-                  <option value="100mbps">100 Mbps</option>
-                  <option value="200mbps">200 Mbps</option>
-                  <option value="500mbps">500 Mbps</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comentarios Adicionales
-                </label>
-                <textarea
-                  rows={4}
-                  value={formData.comentarios}
-                  onChange={(e) => setFormData({...formData, comentarios: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  placeholder="¿Algo más que debamos saber?"
-                ></textarea>
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {error}
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => setStep('cobertura')}
-                  className="flex-1 bg-gray-200 text-gray-700 py-4 px-6 rounded-lg font-semibold text-lg hover:bg-gray-300 transition"
-                >
-                  ← Atrás
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-700 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? 'Enviando...' : 'Enviar Solicitud →'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Step 3: Confirmación */}
-        {step === 'confirmacion' && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center">
-            <div className="text-6xl mb-6">🎉</div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              ¡Solicitud Recibida!
-            </h2>
-            <p className="text-xl text-gray-600 mb-6">
-              Gracias por tu interés, <strong>{formData.nombre}</strong>
-            </p>
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold text-purple-900 mb-3">¿Qué sigue?</h3>
-              <ul className="text-left space-y-3 text-gray-700">
-                <li className="flex items-start">
-                  <span className="text-purple-600 font-bold mr-3">1.</span>
-                  <span>Un representante revisará tu solicitud en las próximas 24 horas</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-purple-600 font-bold mr-3">2.</span>
-                  <span>Te contactaremos por WhatsApp al <strong>{formData.telefono}</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-purple-600 font-bold mr-3">3.</span>
-                  <span>Verificaremos la cobertura en tu zona</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-purple-600 font-bold mr-3">4.</span>
-                  <span>Agendaremos tu instalación si hay cobertura disponible</span>
-                </li>
-              </ul>
-            </div>
-            <Link
-              href="/"
-              className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-lg font-semibold text-lg hover:scale-105 transition-transform"
-            >
-              Volver al Inicio
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Info Section */}
-      <section className="bg-gradient-to-r from-purple-50 to-indigo-50 py-12">
-        <div className="max-w-4xl mx-auto px-4">
-          <h3 className="text-2xl font-bold text-center text-gray-900 mb-8">
-            ¿Por qué elegir Easy Access NewTelecom?
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-md text-center">
-              <div className="text-4xl mb-3">⚡</div>
-              <h4 className="font-bold text-gray-900 mb-2">Alta Velocidad</h4>
-              <p className="text-sm text-gray-600">Internet simétrico de fibra óptica</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-md text-center">
-              <div className="text-4xl mb-3">🛠️</div>
-              <h4 className="font-bold text-gray-900 mb-2">Soporte 24/7</h4>
-              <p className="text-sm text-gray-600">Asistencia técnica cuando la necesites</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-md text-center">
-              <div className="text-4xl mb-3">💰</div>
-              <h4 className="font-bold text-gray-900 mb-2">Mejor Precio</h4>
-              <p className="text-sm text-gray-600">Planes accesibles sin compromisos</p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="mb-2">© 2025 Easy Access NewTelecom - Todos los derechos reservados</p>
-          <p className="mb-2">
-            <a href="https://www.easyaccessnet.com" className="text-purple-400 hover:text-purple-300">
-              www.easyaccessnet.com
-            </a>{' '}
-            | Tel: 998 395 0232 | 998 218 0759
-          </p>
-          <p className="text-sm text-gray-400">
-            Autorización IFT/223/UCS/AUT-COM-065/2018
-          </p>
+      {/* Coverage Form */}
+      <section id="cobertura" className="py-20 px-6 bg-gradient-to-br from-blue-600 to-purple-600">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+            <div className="text-center mb-8">
+              <h2 className="text-4xl font-bold text-gray-900 mb-4">
+                {currentStep === 1 && '📍 Verifica Tu Cobertura'}
+                {currentStep === 2 && '👤 Datos Personales'}
+                {currentStep === 3 && '🏠 Dirección de Instalación'}
+                {currentStep === 4 && '📦 Confirma Tu Plan'}
+              </h2>
+              <p className="text-gray-600">
+                Paso {currentStep} de 4
+              </p>
+            </div>
+
+            <div className="flex justify-center mb-8">
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4].map((step) => (
+                  <div key={step} className="flex items-center">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                        step === currentStep
+                          ? 'bg-blue-600 text-white'
+                          : step < currentStep
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {step < currentStep ? <CheckCircle className="w-6 h-6" /> : step}
+                    </div>
+                    {step < 4 && (
+                      <div
+                        className={`w-12 h-1 ${
+                          step < currentStep ? 'bg-green-500' : 'bg-gray-200'
+                        }`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Step 1: Coverage */}
+              {currentStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ciudad
+                    </label>
+                    <input
+                      type="text"
+                      name="ciudad"
+                      value={formData.ciudad}
+                      onChange={handleInputChange}
+                      placeholder="Ej: Ciudad de México"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Colonia
+                    </label>
+                    <input
+                      type="text"
+                      name="colonia"
+                      value={formData.colonia}
+                      onChange={handleInputChange}
+                      placeholder="Ej: Roma Norte"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Código Postal
+                    </label>
+                    <input
+                      type="text"
+                      name="codigoPostal"
+                      value={formData.codigoPostal}
+                      onChange={handleInputChange}
+                      placeholder="Ej: 06700"
+                      maxLength={5}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={checkingCoverage}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {checkingCoverage ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-5 h-5" />
+                        Verificar Cobertura
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Personal Data */}
+              {currentStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nombre Completo *
+                    </label>
+                    <input
+                      type="text"
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleInputChange}
+                      placeholder="Tu nombre completo"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Correo Electrónico *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="tu@email.com"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Teléfono / WhatsApp *
+                    </label>
+                    <input
+                      type="tel"
+                      name="telefono"
+                      value={formData.telefono}
+                      onChange={handleInputChange}
+                      placeholder="5512345678"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+                    >
+                      Atrás
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Address */}
+              {currentStep === 3 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Calle *
+                    </label>
+                    <input
+                      type="text"
+                      name="calle"
+                      value={formData.calle}
+                      onChange={handleInputChange}
+                      placeholder="Nombre de la calle"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Número Exterior *
+                      </label>
+                      <input
+                        type="text"
+                        name="numeroExterior"
+                        value={formData.numeroExterior}
+                        onChange={handleInputChange}
+                        placeholder="123"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Número Interior
+                      </label>
+                      <input
+                        type="text"
+                        name="numeroInterior"
+                        value={formData.numeroInterior}
+                        onChange={handleInputChange}
+                        placeholder="Depto 4"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Referencias
+                    </label>
+                    <textarea
+                      name="referencias"
+                      value={formData.referencias}
+                      onChange={handleInputChange}
+                      placeholder="Entre qué calles, edificio verde, etc."
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+                    >
+                      Atrás
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Plan Confirmation */}
+              {currentStep === 4 && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Selecciona tu Plan
+                    </label>
+                    <div className="space-y-3">
+                      {plans.map((plan) => (
+                        <div
+                          key={plan.name}
+                          onClick={() => setFormData({ ...formData, planSeleccionado: plan.name })}
+                          className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                            formData.planSeleccionado === plan.name
+                              ? 'border-blue-600 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-bold text-gray-900">{plan.name}</h4>
+                              <p className="text-sm text-gray-600">{plan.speed}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-gray-900">${plan.price}</p>
+                              <p className="text-xs text-gray-600">por mes</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <h4 className="font-semibold text-blue-900 mb-2">📋 Resumen</h4>
+                    <div className="text-sm text-blue-800 space-y-1">
+                      <p><strong>Plan:</strong> {formData.planSeleccionado}</p>
+                      <p><strong>Nombre:</strong> {formData.nombre}</p>
+                      <p><strong>Email:</strong> {formData.email}</p>
+                      <p><strong>Teléfono:</strong> {formData.telefono}</p>
+                      <p><strong>Dirección:</strong> {formData.calle} #{formData.numeroExterior}, {formData.colonia}, {formData.ciudad}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition-colors"
+                    >
+                      Atrás
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      Confirmar Registro
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
         </div>
-      </footer>
+      </section>
+
+      {/* Contact Section */}
+      <section className="py-20 px-6 bg-gray-900 text-white">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl font-bold mb-4">
+            ¿Prefieres Hablar con Nosotros?
+          </h2>
+          <p className="text-xl text-gray-300 mb-12">
+            Nuestro equipo de ventas está listo para ayudarte
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <button
+              onClick={contactWhatsApp}
+              className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
+            >
+              <MessageCircle className="w-12 h-12" />
+              <span>WhatsApp</span>
+              <span className="text-sm font-normal text-green-100">Respuesta inmediata</span>
+            </button>
+
+            <button
+              onClick={contactTelegram}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
+            >
+              <Send className="w-12 h-12" />
+              <span>Telegram</span>
+              <span className="text-sm font-normal text-blue-100">Chat directo</span>
+            </button>
+
+            <button
+              onClick={contactWispChat}
+              className="bg-purple-500 hover:bg-purple-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
+            >
+              <MessageCircle className="w-12 h-12" />
+              <span>WispChat</span>
+              <span className="text-sm font-normal text-purple-100">ventas@easyaccessnet.com</span>
+            </button>
+          </div>
+
+          <div className="mt-12 pt-12 border-t border-gray-700">
+            <p className="text-gray-400 text-sm">
+              Easy Access NewTelecom © 2025. Internet confiable para tu hogar y negocio.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
