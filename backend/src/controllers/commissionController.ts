@@ -185,3 +185,79 @@ export class CommissionController {
 }
 
 export const commissionController = new CommissionController();
+
+  // Obtener comisiones del cliente actual
+  async getMyCommissions(req: any, res: any) {
+    try {
+      const clientId = req.user.clientId;
+      const commissions = await commissionService.getCommissionsByClient(clientId);
+      res.json({ success: true, data: commissions });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  // Obtener resumen de comisiones
+  async getCommissionsSummary(req: any, res: any) {
+    try {
+      const clientId = req.user.clientId;
+      const summary = await commissionService.getCommissionsSummary(clientId);
+      res.json({ success: true, data: summary });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  // Generar comisión por instalación (admin)
+  async generateInstallationCommission(req: any, res: any) {
+    try {
+      const { referralId } = req.body;
+      const commission = await commissionService.generateInstallationCommission(referralId);
+      res.json({ success: true, data: commission });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // Generar comisión mensual (admin)
+  async generateMonthlyCommission(req: any, res: any) {
+    try {
+      const { referralId, paymentNumber, paymentDate } = req.body;
+      const commission = await commissionService.generateMonthlyCommission(
+        referralId,
+        paymentNumber,
+        new Date(paymentDate)
+      );
+      res.json({ success: true, data: commission });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // Aplicar comisión a factura
+  async applyToInvoice(req: any, res: any) {
+    try {
+      const { id } = req.params;
+      const { invoiceId } = req.body;
+      const commission = await commissionService.applyCommission(id, invoiceId);
+      res.json({ success: true, data: commission });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // Cancelar comisión
+  async cancelCommission(req: any, res: any) {
+    try {
+      const { id } = req.params;
+      const commission = await commissionService.updateCommission(id, {
+        status: 'CANCELLED' as any,
+      });
+      res.json({ success: true, data: commission });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  }
+}
+
+export const commissionController = new CommissionController();

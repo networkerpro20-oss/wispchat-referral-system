@@ -276,3 +276,84 @@ export class CommissionService {
 }
 
 export const commissionService = new CommissionService();
+
+  // Método faltante: getCommissionsByReferral
+  async getCommissionsByReferral(referralId: string) {
+    return await prisma.commission.findMany({
+      where: { referralId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Obtener comisiones por cliente
+  async getCommissionsByClient(clientId: string) {
+    return await prisma.commission.findMany({
+      where: {
+        referral: {
+          clientId,
+        },
+      },
+      include: {
+        referral: {
+          select: {
+            name: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Obtener resumen de comisiones
+  async getCommissionsSummary(clientId: string) {
+    const commissions = await this.getCommissionsByClient(clientId);
+    
+    const total = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
+    const earned = commissions.filter(c => c.status === 'EARNED').reduce((sum, c) => sum + Number(c.amount), 0);
+    const applied = commissions.filter(c => c.status === 'APPLIED').reduce((sum, c) => sum + Number(c.amount), 0);
+    const pending = commissions.filter(c => c.status === 'PENDING').reduce((sum, c) => sum + Number(c.amount), 0);
+
+    return {
+      total,
+      earned,
+      applied,
+      pending,
+      count: commissions.length,
+    };
+  }
+
+  // Aplicar comisión
+  async applyCommission(commissionId: string, appliedToInvoice?: string) {
+    const commission = await prisma.commission.findUnique({
+      where: { id: commissionId },
+    });
+
+    if (!commission) {
+      throw new Error('Commission not found');
+    }
+
+    if (commission.status !== 'EARNED') {
+      throw new Error('Commission must be EARNED to apply');
+    }
+
+    return await prisma.commission.update({
+      where: { id: commissionId },
+      data: {
+        status: 'APPLIED',
+        appliedDate: new Date(),
+        appliedToInvoice,
+      },
+    });
+  }
+
+  // Actualizar comisión
+  async updateCommission(commissionId: string, data: any) {
+    return await prisma.commission.update({
+      where: { id: commissionId },
+      data,
+    });
+  }
+}
+
+export const commissionService = new CommissionService();
