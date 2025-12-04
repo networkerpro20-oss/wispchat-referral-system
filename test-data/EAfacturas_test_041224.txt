@@ -1,0 +1,6 @@
+#Factura	Usuario	Cliente	Fecha Emisión	Estado	ID Servicio	Total
+FA001	admin	Juan Pérez	01/12/2024	PAID	EASY-12345	500.00
+FA002	admin	María García	01/12/2024	PAID	SRV-00234	450.00
+FA003	admin	Carlos López	01/12/2024	PENDING	EASY-67890	600.00
+FA004	admin	Ana Martínez	01/12/2024	PAID	SRV-00156	520.00
+FA005	admin	Luis Rodríguez	01/12/2024	PAID	EASY-11111	480.00
