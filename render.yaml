@@ -15,9 +15,9 @@ services:
     env: node
     region: oregon
     plan: free
-    # buildCache reactivada después del deployment exitoso
-    buildCache: true
-    buildCommand: npm install && npx prisma generate && npm run build
+    # buildCache desactivada por error TS2688 persistente
+    buildCache: false
+    buildCommand: npm ci && npm install --save-dev @types/node@22 && npx prisma generate && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
