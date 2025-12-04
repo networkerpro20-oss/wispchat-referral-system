@@ -30,5 +30,8 @@
     "react-hot-toast": "^2.6.0",
     "tailwindcss": "^4.1.17",
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "vercel": "^48.12.1"
   }
 }
