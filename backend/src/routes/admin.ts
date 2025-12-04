@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import adminController from '../controllers/adminController';
+import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = Router();
+
+/**
+ * TODAS las rutas de admin requieren autenticación
+ * Se aplica el middleware a todas las rutas del router
+ */
+router.use(authenticateToken);
 
 /**
  * GET /api/admin/dashboard
