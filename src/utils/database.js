@@ -1,6 +1,8 @@
 // In-memory database for demo purposes
 // In production, this should be replaced with a proper database (PostgreSQL, MongoDB, etc.)
 
+const crypto = require('crypto');
+
 class Database {
   constructor() {
     this.users = new Map();
@@ -12,17 +14,18 @@ class Database {
 
   // User operations
   saveUser(user) {
-    // Check for referral code collision
-    if (this.referralCodeIndex.has(user.referralCode)) {
-      // Regenerate referral code if collision occurs
-      const crypto = require('crypto');
+    // Check for referral code collision and regenerate if needed
+    const maxRetries = 10;
+    let retries = 0;
+    
+    while (this.referralCodeIndex.has(user.referralCode) && retries < maxRetries) {
       const prefix = 'EA';
       user.referralCode = `${prefix}-${crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase()}`;
-      
-      // Recursively check until we get a unique code (extremely unlikely to loop)
-      if (this.referralCodeIndex.has(user.referralCode)) {
-        return this.saveUser(user);
-      }
+      retries++;
+    }
+    
+    if (retries >= maxRetries) {
+      throw new Error('Unable to generate unique referral code after multiple attempts');
     }
     
     this.users.set(user.id, user);

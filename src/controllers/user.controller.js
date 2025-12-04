@@ -52,30 +52,29 @@ class UserController {
             error: 'Invalid referral code'
           });
         }
-        if (referrer) {
-          user.referredBy = referrer.id;
+        
+        user.referredBy = referrer.id;
           
-          // Create referral record
-          const referral = new Referral(referrer.id, user.id);
-          db.saveReferral(referral);
-          
-          // Complete the referral and award points
-          referral.complete(REWARD_PER_REFERRAL);
-          
-          // Update referrer's stats
-          referrer.incrementReferralCount();
-          referrer.addReward(REWARD_PER_REFERRAL);
-          
-          // Create reward record
-          const reward = new Reward(
-            referrer.id,
-            REWARD_PER_REFERRAL,
-            'referral',
-            `Referral reward for ${user.name}`
-          );
-          reward.approve();
-          db.saveReward(reward);
-        }
+        // Create referral record
+        const referral = new Referral(referrer.id, user.id);
+        db.saveReferral(referral);
+        
+        // Complete the referral and award points
+        referral.complete(REWARD_PER_REFERRAL);
+        
+        // Update referrer's stats
+        referrer.incrementReferralCount();
+        referrer.addReward(REWARD_PER_REFERRAL);
+        
+        // Create reward record
+        const reward = new Reward(
+          referrer.id,
+          REWARD_PER_REFERRAL,
+          'referral',
+          `Referral reward for ${user.name}`
+        );
+        reward.approve();
+        db.saveReward(reward);
       }
 
       db.saveUser(user);
