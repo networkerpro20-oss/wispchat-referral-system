@@ -4,13 +4,10 @@ import dotenv from 'dotenv';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 
-// Importar rutas
-import referralRoutes from './routes/referrals';
-import documentRoutes from './routes/documents';
-import installationRoutes from './routes/installations';
-import commissionRoutes from './routes/commissions';
-import webhookRoutes from './routes/webhooks';
+// Importar nuevas rutas
+import clientRoutes from './routes/clients';
 import leadRoutes from './routes/leads';
+import adminRoutes from './routes/admin';
 
 dotenv.config();
 
@@ -26,25 +23,22 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Servir archivos estáticos (uploads)
+// Servir archivos estáticos (uploads) - por si se necesita después
 app.use('/uploads', express.static(config.uploadDir));
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'WispChat Referral System API',
+    message: 'Easy Access Referral System API',
     timestamp: new Date().toISOString(),
   });
 });
 
 // API Routes
-app.use('/api/v1/referrals', referralRoutes);
-app.use('/api/v1/documents', documentRoutes);
-app.use('/api/v1/installations', installationRoutes);
-app.use('/api/v1/commissions', commissionRoutes);
-app.use('/api/v1/webhooks', webhookRoutes);
-app.use('/api/leads', leadRoutes); // Ruta pública para captura de leads
+app.use('/api/clients', clientRoutes);      // Rutas para clientes
+app.use('/api/leads', leadRoutes);          // Rutas para leads (público)
+app.use('/api/admin', adminRoutes);         // Rutas para admin
 
 // Error handler
 app.use(errorHandler);

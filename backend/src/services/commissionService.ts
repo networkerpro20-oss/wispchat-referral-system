@@ -1,359 +1,331 @@
-import { prisma } from '../config/database';
-import { CommissionType, CommissionStatus } from '@prisma/client';
+import prisma from '../lib/prisma';
+import { Commission, CommissionStatus, CommissionType } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import clientService from './clientService';
 
-export class CommissionService {
-  // Generar comisión por instalación
-  async generateInstallationCommission(referralId: string) {
+/**
+ * Servicio para manejar comisiones
+ */
+class CommissionService {
+  /**
+   * Generar comisión de instalación
+   */
+  async generateInstallationCommission(referralId: string): Promise<Commission> {
     const referral = await prisma.referral.findUnique({
       where: { id: referralId },
-      include: { installation: true },
+      include: { client: true },
     });
 
-    if (!referral || !referral.installation) {
-      throw new Error('Referral or installation not found');
+    if (!referral) throw new Error('Referido no encontrado');
+    if (referral.status !== 'INSTALLED') {
+      throw new Error('El referido debe estar instalado');
     }
 
-    if (referral.installation.status !== 'COMPLETED') {
-      throw new Error('Installation not completed');
-    }
-
-    const settings = await prisma.referralSettings.findUnique({
-      where: { tenantId: referral.tenantId },
-    });
-
-    if (!settings) {
-      throw new Error('Referral settings not found');
-    }
-
-    // Verificar si ya existe comisión de instalación
+    // Verificar que no exista ya
     const existing = await prisma.commission.findFirst({
       where: {
         referralId,
-        type: CommissionType.INSTALLATION,
+        type: 'INSTALLATION',
       },
     });
 
     if (existing) {
-      return existing;
+      throw new Error('Ya existe una comisión de instalación para este referido');
     }
 
-    // Crear comisión de instalación
-    return await prisma.commission.create({
+    const settings = await prisma.settings.findFirst();
+    const amount = settings?.installationAmount || new Decimal(500);
+
+    const commission = await prisma.commission.create({
       data: {
+        clientId: referral.clientId,
         referralId,
-        type: CommissionType.INSTALLATION,
-        amount: settings.installationCommission,
-        status: CommissionStatus.EARNED,
+        type: 'INSTALLATION',
+        amount,
+        status: 'EARNED',
       },
     });
+
+    await clientService.updateStats(referral.clientId);
+
+    return commission;
   }
 
-  // Generar comisión mensual
-  async generateMonthlyCommission(referralId: string, paymentNumber: number, paymentDate: Date) {
+  /**
+   * Generar comisión mensual
+   */
+  async generateMonthlyCommission(
+    referralId: string,
+    monthNumber: number,
+    monthDate: Date
+  ): Promise<Commission> {
+    if (monthNumber < 1 || monthNumber > 6) {
+      throw new Error('El número de mes debe estar entre 1 y 6');
+    }
+
     const referral = await prisma.referral.findUnique({
       where: { id: referralId },
     });
 
-    if (!referral) {
-      throw new Error('Referral not found');
+    if (!referral) throw new Error('Referido no encontrado');
+    if (referral.status !== 'INSTALLED') {
+      throw new Error('El referido debe estar instalado');
     }
 
-    const settings = await prisma.referralSettings.findUnique({
-      where: { tenantId: referral.tenantId },
-    });
-
-    if (!settings) {
-      throw new Error('Referral settings not found');
-    }
-
-    // Verificar si el número de pago está dentro del límite
-    if (paymentNumber > settings.commissionMonths) {
-      console.log(`Payment ${paymentNumber} exceeds commission months limit (${settings.commissionMonths})`);
-      return null;
-    }
-
-    // Verificar si ya existe comisión para este pago
+    // Verificar que no exista ya este mes
     const existing = await prisma.commission.findFirst({
       where: {
         referralId,
-        type: CommissionType.MONTHLY,
-        paymentNumber,
+        type: 'MONTHLY',
+        monthNumber,
       },
     });
 
     if (existing) {
-      return existing;
+      throw new Error(`Ya existe una comisión para el mes ${monthNumber}`);
     }
 
-    // Crear comisión mensual
-    return await prisma.commission.create({
+    const settings = await prisma.settings.findFirst();
+    const amount = settings?.monthlyAmount || new Decimal(50);
+
+    const commission = await prisma.commission.create({
       data: {
+        clientId: referral.clientId,
         referralId,
-        type: CommissionType.MONTHLY,
-        amount: settings.monthlyCommission,
-        paymentNumber,
-        paymentDate,
-        status: CommissionStatus.EARNED,
+        type: 'MONTHLY',
+        amount,
+        monthNumber,
+        monthDate,
+        status: 'EARNED',
       },
     });
+
+    await clientService.updateStats(referral.clientId);
+
+    return commission;
   }
 
-  // Obtener comisiones de un referidor
-  async getMyCommissions(referrerId: string, tenantId: string) {
-    return await prisma.commission.findMany({
-      where: {
-        referral: {
-          referrerId,
-          tenantId,
-        },
-      },
-      include: {
-        referral: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  // Aplicar comisión a factura
-  async applyToInvoice(commissionId: string, invoiceId: string, appliedAmount?: number) {
-    const commission = await prisma.commission.findUnique({
-      where: { id: commissionId },
-    });
-
-    if (!commission) {
-      throw new Error('Commission not found');
-    }
-
-    if (commission.status !== CommissionStatus.EARNED) {
-      throw new Error('Commission not in EARNED status');
-    }
-
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data: {
-        status: CommissionStatus.APPLIED,
-        appliedToInvoice: true,
-        invoiceId,
-        appliedAmount: appliedAmount || commission.amount,
-        appliedDate: new Date(),
-      },
-    });
-  }
-
-  // Cancelar comisión
-  async cancelCommission(commissionId: string, reason: string) {
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data: {
-        status: CommissionStatus.CANCELLED,
-        notes: reason,
-      },
-    });
-  }
-
-  // Obtener todas las comisiones (Admin)
-  async getAllCommissions(tenantId: string, filters?: {
+  /**
+   * Obtener comisiones del cliente
+   */
+  async getClientCommissions(clientId: string, filters?: {
     status?: CommissionStatus;
     type?: CommissionType;
-    referralId?: string;
   }) {
-    const where: any = {
-      referral: { tenantId },
-    };
-
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-
-    if (filters?.type) {
-      where.type = filters.type;
-    }
-
-    if (filters?.referralId) {
-      where.referralId = filters.referralId;
-    }
+    const where: any = { clientId };
+    if (filters?.status) where.status = filters.status;
+    if (filters?.type) where.type = filters.type;
 
     return await prisma.commission.findMany({
       where,
+      orderBy: { createdAt: 'desc' },
       include: {
         referral: {
           select: {
-            name: true,
-            email: true,
-            referrerName: true,
-            referrerEmail: true,
+            nombre: true,
+            telefono: true,
+            status: true,
+          },
+        },
+        applications: {
+          select: {
+            amount: true,
+            appliedAt: true,
+            invoiceMonth: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
   }
 
-  // Obtener resumen de comisiones
-  async getCommissionsSummary(tenantId: string) {
-    const commissions = await prisma.commission.findMany({
-      where: {
-        referral: { tenantId },
+  /**
+   * Obtener comisiones pendientes de aplicar
+   */
+  async getPendingCommissions(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit;
+
+    const [commissions, total] = await Promise.all([
+      prisma.commission.findMany({
+        where: { status: 'EARNED' },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take: limit,
+        include: {
+          client: {
+            select: {
+              wispHubClientId: true,
+              nombre: true,
+              email: true,
+            },
+          },
+          referral: {
+            select: {
+              nombre: true,
+              telefono: true,
+            },
+          },
+        },
+      }),
+      prisma.commission.count({ where: { status: 'EARNED' } }),
+    ]);
+
+    return {
+      commissions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Aplicar comisión a factura
+   */
+  async applyToInvoice(data: {
+    commissionId: string;
+    amount: number;
+    wispHubInvoiceId: string;
+    invoiceMonth: string;
+    invoiceAmount: number;
+    appliedBy: string;
+    notas?: string;
+  }) {
+    const commission = await prisma.commission.findUnique({
+      where: { id: data.commissionId },
+      include: {
+        applications: true,
       },
     });
 
-    const totalGenerated = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
-    const totalEarned = commissions
-      .filter(c => c.status === 'EARNED' || c.status === 'APPLIED' || c.status === 'PAID')
-      .reduce((sum, c) => sum + Number(c.amount), 0);
-    const totalApplied = commissions
-      .filter(c => c.status === 'APPLIED')
-      .reduce((sum, c) => sum + Number(c.appliedAmount || c.amount), 0);
-    const totalPending = commissions
-      .filter(c => c.status === 'PENDING' || c.status === 'EARNED')
-      .reduce((sum, c) => sum + Number(c.amount), 0);
+    if (!commission) throw new Error('Comisión no encontrada');
+
+    // Calcular cuánto se ha aplicado ya
+    const totalApplied = commission.applications.reduce(
+      (sum, app) => sum + Number(app.amount),
+      0
+    );
+
+    const remaining = Number(commission.amount) - totalApplied;
+
+    if (data.amount > remaining) {
+      throw new Error(`Solo quedan $${remaining.toFixed(2)} disponibles para aplicar`);
+    }
+
+    // Crear la aplicación
+    const application = await prisma.commissionApplication.create({
+      data: {
+        commissionId: data.commissionId,
+        amount: new Decimal(data.amount),
+        wispHubInvoiceId: data.wispHubInvoiceId,
+        invoiceMonth: data.invoiceMonth,
+        invoiceAmount: new Decimal(data.invoiceAmount),
+        appliedBy: data.appliedBy,
+        notas: data.notas,
+      },
+    });
+
+    // Si se aplicó todo, marcar como APPLIED
+    const newTotalApplied = totalApplied + data.amount;
+    if (newTotalApplied >= Number(commission.amount)) {
+      await prisma.commission.update({
+        where: { id: data.commissionId },
+        data: { status: 'APPLIED' },
+      });
+    }
+
+    // Actualizar stats del cliente
+    await clientService.updateStats(commission.clientId);
+
+    return application;
+  }
+
+  /**
+   * Cancelar comisión
+   */
+  async cancelCommission(commissionId: string, reason: string): Promise<Commission> {
+    const commission = await prisma.commission.findUnique({
+      where: { id: commissionId },
+      include: { applications: true },
+    });
+
+    if (!commission) throw new Error('Comisión no encontrada');
+
+    if (commission.applications.length > 0) {
+      throw new Error('No se puede cancelar una comisión que ya tiene aplicaciones');
+    }
+
+    const updated = await prisma.commission.update({
+      where: { id: commissionId },
+      data: {
+        status: 'CANCELLED',
+        notas: `Cancelada: ${reason}`,
+      },
+    });
+
+    await clientService.updateStats(commission.clientId);
+
+    return updated;
+  }
+
+  /**
+   * Resumen de comisiones por cliente
+   */
+  async getClientSummary(clientId: string) {
+    const [earned, applied, cancelled] = await Promise.all([
+      prisma.commission.aggregate({
+        where: { clientId, status: { in: ['EARNED', 'APPLIED'] } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.commissionApplication.aggregate({
+        where: { commission: { clientId } },
+        _sum: { amount: true },
+      }),
+      prisma.commission.aggregate({
+        where: { clientId, status: 'CANCELLED' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
+
+    const totalEarned = Number(earned._sum.amount || 0);
+    const totalApplied = Number(applied._sum.amount || 0);
 
     return {
-      totalGenerated,
       totalEarned,
       totalApplied,
-      totalPending,
-      byType: {
-        installation: commissions.filter(c => c.type === 'INSTALLATION').length,
-        monthly: commissions.filter(c => c.type === 'MONTHLY').length,
-      },
-      byStatus: {
-        pending: commissions.filter(c => c.status === 'PENDING').length,
-        earned: commissions.filter(c => c.status === 'EARNED').length,
-        applied: commissions.filter(c => c.status === 'APPLIED').length,
-        cancelled: commissions.filter(c => c.status === 'CANCELLED').length,
-      },
+      pendingBalance: totalEarned - totalApplied,
+      totalCommissions: earned._count,
+      cancelledCommissions: cancelled._count,
     };
   }
 
-  // Aplicar comisión (cambiar a APPLIED) - NUEVO
-  async applyCommission(commissionId: string, appliedToInvoice?: string) {
-    const commission = await prisma.commission.findUnique({
-      where: { id: commissionId },
-    });
-
-    if (!commission) {
-      throw new Error('Commission not found');
-    }
-
-    if (commission.status !== CommissionStatus.EARNED) {
-      throw new Error('Commission must be EARNED to apply');
-    }
-
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data: {
-        status: CommissionStatus.APPLIED,
-        appliedDate: new Date(),
-        appliedToInvoice,
-      },
-    });
-  }
-
-  // Actualizar comisión - NUEVO
-  async updateCommission(commissionId: string, data: {
-    amount?: number;
-    status?: CommissionStatus;
-    notes?: string;
-  }) {
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data,
-    });
-  }
-
-  // Eliminar comisión - NUEVO
-  async deleteCommission(commissionId: string) {
-    return await prisma.commission.delete({
-      where: { id: commissionId },
-    });
-  }
-}
-
-export const commissionService = new CommissionService();
-
-  // Método faltante: getCommissionsByReferral
-  async getCommissionsByReferral(referralId: string) {
-    return await prisma.commission.findMany({
-      where: { referralId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  // Obtener comisiones por cliente
-  async getCommissionsByClient(clientId: string) {
-    return await prisma.commission.findMany({
+  /**
+   * Historial de aplicaciones del cliente
+   */
+  async getClientApplicationHistory(clientId: string) {
+    return await prisma.commissionApplication.findMany({
       where: {
-        referral: {
-          clientId,
-        },
+        commission: { clientId },
       },
+      orderBy: { appliedAt: 'desc' },
       include: {
-        referral: {
+        commission: {
           select: {
-            name: true,
-            phone: true,
+            type: true,
+            amount: true,
+            referral: {
+              select: {
+                nombre: true,
+              },
+            },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  // Obtener resumen de comisiones
-  async getCommissionsSummary(clientId: string) {
-    const commissions = await this.getCommissionsByClient(clientId);
-    
-    const total = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
-    const earned = commissions.filter(c => c.status === 'EARNED').reduce((sum, c) => sum + Number(c.amount), 0);
-    const applied = commissions.filter(c => c.status === 'APPLIED').reduce((sum, c) => sum + Number(c.amount), 0);
-    const pending = commissions.filter(c => c.status === 'PENDING').reduce((sum, c) => sum + Number(c.amount), 0);
-
-    return {
-      total,
-      earned,
-      applied,
-      pending,
-      count: commissions.length,
-    };
-  }
-
-  // Aplicar comisión
-  async applyCommission(commissionId: string, appliedToInvoice?: string) {
-    const commission = await prisma.commission.findUnique({
-      where: { id: commissionId },
-    });
-
-    if (!commission) {
-      throw new Error('Commission not found');
-    }
-
-    if (commission.status !== 'EARNED') {
-      throw new Error('Commission must be EARNED to apply');
-    }
-
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data: {
-        status: 'APPLIED',
-        appliedDate: new Date(),
-        appliedToInvoice,
-      },
-    });
-  }
-
-  // Actualizar comisión
-  async updateCommission(commissionId: string, data: any) {
-    return await prisma.commission.update({
-      where: { id: commissionId },
-      data,
     });
   }
 }
 
-export const commissionService = new CommissionService();
+export default new CommissionService();
