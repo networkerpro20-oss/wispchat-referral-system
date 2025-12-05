@@ -5,10 +5,11 @@ import { User } from '../types/express';
 
 export interface JWTPayload {
   userId: string;
-  email: string;
-  rol: string;  // WispChat usa "rol" (sin "e")
-  tenantId: string;
-  tenantDomain: string;
+  email?: string;
+  role: string;  // WispChat usa 'role' (inglés)
+  tenantId?: string;
+  tenantDomain?: string;
+  isAgent?: boolean;
 }
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
@@ -30,10 +31,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Agregar usuario al request
     req.user = {
       id: decoded.userId,
-      email: decoded.email,
-      rol: decoded.rol,
-      tenantId: decoded.tenantId,
-      tenantDomain: decoded.tenantDomain,
+      email: decoded.email || '',
+      role: decoded.role,
+      tenantId: decoded.tenantId || '',
+      tenantDomain: decoded.tenantDomain || '',
     } as User;
 
     next();
@@ -68,7 +69,7 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
     });
   }
 
-  if (req.user.rol !== 'admin' && req.user.rol !== 'staff') {
+  if (req.user.role !== 'admin' && req.user.role !== 'staff') {
     return res.status(403).json({
       success: false,
       message: 'Insufficient permissions',

@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   email: string;
-  rol: string;
+  role: string;  // WispChat usa 'role' (inglés)
   tenantId: string;
   tenantDomain: string;
 }
