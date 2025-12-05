@@ -4,10 +4,12 @@ import dotenv from 'dotenv';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 
-// Importar nuevas rutas
+// Importar rutas
 import clientRoutes from './routes/clients';
 import leadRoutes from './routes/leads';
 import adminRoutes from './routes/admin';
+import settingsRoutes from './routes/settings';
+import plansRoutes from './routes/plans';
 
 dotenv.config();
 
@@ -23,7 +25,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Servir archivos estáticos (uploads) - por si se necesita después
+// Servir archivos estáticos (uploads)
 app.use('/uploads', express.static(config.uploadDir));
 
 // Health check
@@ -39,6 +41,8 @@ app.get('/health', (req, res) => {
 app.use('/api/clients', clientRoutes);      // Rutas para clientes
 app.use('/api/leads', leadRoutes);          // Rutas para leads (público)
 app.use('/api/admin', adminRoutes);         // Rutas para admin
+app.use('/api/settings', settingsRoutes);   // Settings (público + admin)
+app.use('/api/plans', plansRoutes);         // Plans (público + admin)
 
 // Error handler
 app.use(errorHandler);
