@@ -31,7 +31,7 @@ export default function DashboardRouter() {
         router.push('/admin/dashboard');
       } else {
         // Es cliente, verificar si está registrado
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-backend.onrender.com/api/v1';
+        const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
         const response = await fetch(`${API_URL}/referrals/check`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -66,7 +66,7 @@ export default function DashboardRouter() {
 
   const autoRegister = async (token: string) => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-backend.onrender.com/api/v1';
+      const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
       const response = await fetch(`${API_URL}/referrals/register`, {
         method: 'POST',
         headers: {

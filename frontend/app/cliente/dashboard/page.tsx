@@ -60,7 +60,7 @@ export default function ClienteDashboard() {
         return;
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-backend.onrender.com/api/v1';
+      const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
       const response = await fetch(`${API_URL}/referrals/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,

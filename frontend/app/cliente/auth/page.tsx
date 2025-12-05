@@ -36,9 +36,9 @@ function ClientAuthContent() {
         localStorage.setItem('accessToken', token);
         addDebug('💾 Token guardado en localStorage');
 
-        // 3. Verificar API URL
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-backend.onrender.com/api/v1';
-        addDebug(`🌐 API_URL: ${API_URL}`);
+        // 3. Verificar API URL - DEBE apuntar al backend de WispChat
+        const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
+        addDebug(`🌐 API_URL (WispChat backend): ${API_URL}`);
         
         const checkUrl = `${API_URL}/referrals/check`;
         addDebug(`📡 Llamando a: ${checkUrl}`);
@@ -77,6 +77,7 @@ function ClientAuthContent() {
           setMessage('Registrándote en el programa de referidos...');
           addDebug('📝 Usuario elegible, registrando...');
 
+          const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
           const registerUrl = `${API_URL}/referrals/register`;
           addDebug(`📡 Registrando en: ${registerUrl}`);
 
