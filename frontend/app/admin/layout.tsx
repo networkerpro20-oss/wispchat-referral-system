@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Upload, FileText, TrendingUp, LogOut, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Upload, FileText, TrendingUp, LogOut, Loader2, Settings, Package } from 'lucide-react';
 
 export default function AdminLayout({
   children,
@@ -114,6 +114,16 @@ export default function AdminLayout({
       href: '/admin/uploads',
       label: 'Historial',
       icon: FileText,
+    },
+    {
+      href: '/admin/configuracion',
+      label: 'Configuración',
+      icon: Settings,
+    },
+    {
+      href: '/admin/configuracion/paquetes',
+      label: 'Paquetes',
+      icon: Package,
     },
   ];
 
