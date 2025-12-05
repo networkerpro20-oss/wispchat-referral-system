@@ -64,7 +64,8 @@ export default function ClienteDashboard() {
       const response = await fetch(`${API_URL}/referrals/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-tenant-domain': 'wispchat.net'
         }
       });
 

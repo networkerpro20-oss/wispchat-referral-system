@@ -46,7 +46,8 @@ function ClientAuthContent() {
         const checkResponse = await fetch(checkUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-tenant-domain': 'wispchat.net'
           }
         });
 
@@ -85,7 +86,8 @@ function ClientAuthContent() {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'x-tenant-domain': 'wispchat.net'
             }
           });
 
