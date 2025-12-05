@@ -1,0 +1,95 @@
+// ============================================================
+// EXPANSIÓN DE SETTINGS Y NUEVO MODELO INTERNETPLAN
+// Para agregar al schema.prisma existente
+// ============================================================
+
+model Settings {
+  id                    String   @id @default(cuid())
+  
+  // === COMISIONES NORMALES ===
+  installationAmount    Decimal  @db.Decimal(10,2) @default(200.00)  // ← CAMBIADO de 500 a 200
+  monthlyAmount         Decimal  @db.Decimal(10,2) @default(50.00)
+  monthsToEarn          Int      @default(6)
+  currency              String   @default("MXN")
+  
+  // === PROMOCIONES TEMPORALES ===
+  promoActive           Boolean  @default(false)
+  promoName             String?
+  promoStartDate        DateTime?
+  promoEndDate          DateTime?
+  promoInstallAmount    Decimal? @db.Decimal(10,2)
+  promoMonthlyAmount    Decimal? @db.Decimal(10,2)
+  promoDescription      String?  @db.Text
+  promoDisplayBanner    Boolean  @default(true)
+  
+  // === CONTACTO ===
+  whatsappNumber        String?
+  whatsappMessage       String?  @db.Text
+  telegramUser          String?
+  telegramGroup         String?
+  phoneNumber           String?
+  supportEmail          String?
+  supportHours          String?
+  
+  // === VIDEO INSTITUCIONAL ===
+  videoEnabled          Boolean  @default(false)
+  videoUrl              String?  // YouTube embed URL
+  videoTitle            String?
+  videoThumbnail        String?
+  
+  // === WISPCHAT (EXISTENTE) ===
+  wispChatUrl           String   @default("https://wispchat-backend.onrender.com")
+  wispChatTenantDomain  String   @default("easyaccessnet.com")
+  wispChatAdminEmail    String?
+  wispChatAdminPassword String?
+  
+  // === NOTIFICACIONES ===
+  notificationEmail     String?
+  
+  updatedAt             DateTime @updatedAt
+}
+
+// ============================================================
+// NUEVO MODELO: PAQUETES DE INTERNET
+// ============================================================
+
+model InternetPlan {
+  id                String   @id @default(cuid())
+  
+  // Identificación
+  name              String   // "Básico", "Hogar", "Premium"
+  slug              String   @unique
+  
+  // Características
+  speed             String   // "20 Mbps", "50 Mbps"
+  speedDownload     Int      // 20, 50, 100 (Mbps)
+  speedUpload       Int?     // Velocidad de subida
+  
+  // Precio
+  price             Decimal  @db.Decimal(10,2)
+  currency          String   @default("MXN")
+  priceLabel        String?  // "al mes"
+  
+  // Destacado
+  popular           Boolean  @default(false)
+  badge             String?  // "Más Vendido", "Recomendado"
+  
+  // Features (JSON array)
+  features          Json     // ["Feature 1", "Feature 2"]
+  
+  // Limitaciones/Info
+  maxDevices        String?  // "2-3 dispositivos"
+  recommendedFor    String?  // "Ideal para navegación"
+  
+  // Orden y estado
+  order             Int      @default(0)
+  active            Boolean  @default(true)
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([order])
+  @@index([active])
+  @@index([popular])
+}
