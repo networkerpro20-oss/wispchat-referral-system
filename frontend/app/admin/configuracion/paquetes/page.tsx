@@ -43,7 +43,7 @@ export default function PaquetesPage() {
       setLoading(true);
       const token = localStorage.getItem('referral_auth_token');
       
-      const response = await fetch(`${API_URL}/api/admin/plans`, {
+      const response = await fetch(`${API_URL}/api/plans/admin`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -101,8 +101,8 @@ export default function PaquetesPage() {
       const token = localStorage.getItem('referral_auth_token');
       
       const url = modalMode === 'create' 
-        ? `${API_URL}/api/admin/plans`
-        : `${API_URL}/api/admin/plans/${editingPlan.id}`;
+        ? `${API_URL}/api/plans/admin`
+        : `${API_URL}/api/plans/admin/${editingPlan.id}`;
       
       const method = modalMode === 'create' ? 'POST' : 'PATCH';
 
@@ -137,7 +137,7 @@ export default function PaquetesPage() {
     try {
       const token = localStorage.getItem('referral_auth_token');
       
-      const response = await fetch(`${API_URL}/api/admin/plans/${id}`, {
+      const response = await fetch(`${API_URL}/api/plans/admin/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -159,7 +159,7 @@ export default function PaquetesPage() {
     try {
       const token = localStorage.getItem('referral_auth_token');
       
-      const response = await fetch(`${API_URL}/api/admin/plans/${id}/toggle`, {
+      const response = await fetch(`${API_URL}/api/plans/admin/${id}/toggle`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
