@@ -9,44 +9,63 @@ function ClientAuthContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'validating' | 'registering' | 'success' | 'error'>('validating');
   const [message, setMessage] = useState('Validando credenciales...');
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  const addDebug = (msg: string) => {
+    console.log(msg);
+    setDebugInfo(prev => [...prev, msg]);
+  };
 
   useEffect(() => {
     const validateAndRegister = async () => {
       try {
+        addDebug('🚀 Iniciando validación...');
+        
         // 1. Obtener token de la URL
         const token = searchParams?.get('token');
+        addDebug(`📝 Token recibido: ${token ? 'SÍ (' + token.substring(0, 30) + '...)' : 'NO'}`);
 
         if (!token) {
           setStatus('error');
-          setMessage('Token no proporcionado');
+          setMessage('Token no proporcionado en la URL');
+          addDebug('❌ No hay token en la URL');
           return;
         }
 
-        console.log('🔍 Validando token cliente...');
-
         // 2. Guardar token en localStorage
         localStorage.setItem('accessToken', token);
+        addDebug('💾 Token guardado en localStorage');
 
-        // 3. Verificar si ya está registrado
+        // 3. Verificar API URL
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-backend.onrender.com/api/v1';
-        const checkResponse = await fetch(`${API_URL}/referrals/check`, {
+        addDebug(`🌐 API_URL: ${API_URL}`);
+        
+        const checkUrl = `${API_URL}/referrals/check`;
+        addDebug(`📡 Llamando a: ${checkUrl}`);
+
+        const checkResponse = await fetch(checkUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
 
+        addDebug(`📊 Status response: ${checkResponse.status} ${checkResponse.statusText}`);
+
         if (!checkResponse.ok) {
-          throw new Error('Error al verificar registro');
+          const errorText = await checkResponse.text();
+          addDebug(`❌ Error response: ${errorText}`);
+          throw new Error(`Error ${checkResponse.status}: ${errorText}`);
         }
 
         const checkData = await checkResponse.json();
-        console.log('✅ Verificación:', checkData);
+        addDebug(`✅ Verificación exitosa: ${JSON.stringify(checkData)}`);
 
         if (checkData.data.registered) {
           // Ya está registrado, ir directo al dashboard
           setStatus('success');
           setMessage('¡Bienvenido de nuevo! Redirigiendo a tu dashboard...');
+          addDebug('✨ Usuario ya registrado, redirigiendo...');
 
           setTimeout(() => {
             router.push('/cliente/dashboard');
@@ -56,8 +75,12 @@ function ClientAuthContent() {
           // Elegible pero no registrado, auto-registrar
           setStatus('registering');
           setMessage('Registrándote en el programa de referidos...');
+          addDebug('📝 Usuario elegible, registrando...');
 
-          const registerResponse = await fetch(`${API_URL}/referrals/register`, {
+          const registerUrl = `${API_URL}/referrals/register`;
+          addDebug(`📡 Registrando en: ${registerUrl}`);
+
+          const registerResponse = await fetch(registerUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -65,13 +88,16 @@ function ClientAuthContent() {
             }
           });
 
+          addDebug(`📊 Register status: ${registerResponse.status}`);
+
           if (!registerResponse.ok) {
             const errorData = await registerResponse.json();
+            addDebug(`❌ Error al registrar: ${JSON.stringify(errorData)}`);
             throw new Error(errorData.error?.message || 'Error al registrar');
           }
 
           const registerData = await registerResponse.json();
-          console.log('✅ Registro exitoso:', registerData);
+          addDebug(`✅ Registro exitoso: ${JSON.stringify(registerData)}`);
 
           setStatus('success');
           setMessage('¡Registro exitoso! Generando tu código de referido...');
@@ -82,12 +108,14 @@ function ClientAuthContent() {
 
         } else {
           // No elegible
+          addDebug(`⚠️ Usuario no elegible: ${checkData.data.reason}`);
           setStatus('error');
           setMessage(checkData.data.reason || 'No eres elegible para el programa de referidos');
         }
 
       } catch (error: any) {
         console.error('❌ Error en auth:', error);
+        addDebug(`❌ ERROR: ${error.message}`);
         setStatus('error');
         setMessage(error.message || 'Error de conexión');
       }
@@ -97,9 +125,9 @@ function ClientAuthContent() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 p-4">
+      <div className="max-w-4xl w-full">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 mb-4">
           {/* Logo/Header */}
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">🎁</div>
@@ -175,6 +203,26 @@ function ClientAuthContent() {
             </p>
           </div>
         </div>
+
+        {/* Debug Panel */}
+        {debugInfo.length > 0 && (
+          <div className="bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white font-bold">🔍 Debug Console</span>
+              <button
+                onClick={() => setDebugInfo([])}
+                className="text-gray-400 hover:text-white text-xs"
+              >
+                Limpiar
+              </button>
+            </div>
+            {debugInfo.map((info, idx) => (
+              <div key={idx} className="py-1 border-b border-gray-800">
+                <span className="text-gray-500">[{idx + 1}]</span> {info}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
