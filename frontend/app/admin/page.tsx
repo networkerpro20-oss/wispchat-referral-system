@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
 
 interface Commission {
   id: string;
@@ -62,7 +62,7 @@ export default function AdminCommissionsPage() {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/commissions/wispchat`, {
+      const response = await axios.get(`${API_URL}/api/commissions/wispchat`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -76,7 +76,7 @@ export default function AdminCommissionsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await axios.get(`${API_URL}/referrals/settings/wispchat`);
+      const response = await axios.get(`${API_URL}/api/referrals/settings/wispchat`);
       setSettings(response.data.data);
       if (response.data.data) {
         setNewInstallationCommission(response.data.data.installationCommission);
@@ -92,7 +92,7 @@ export default function AdminCommissionsPage() {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `${API_URL}/referrals/settings/wispchat`,
+        `${API_URL}/api/referrals/settings/wispchat`,
         {
           installationCommission: newInstallationCommission,
           monthlyCommission: newMonthlyCommission,
@@ -116,7 +116,7 @@ export default function AdminCommissionsPage() {
       const invoice = prompt('Número de factura donde se aplicará (opcional):');
 
       await axios.post(
-        `${API_URL}/commissions/${commissionId}/apply`,
+        `${API_URL}/api/commissions/${commissionId}/apply`,
         { appliedToInvoice: invoice || undefined },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -134,7 +134,7 @@ export default function AdminCommissionsPage() {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `${API_URL}/commissions/${editingCommission.id}`,
+        `${API_URL}/api/commissions/${editingCommission.id}`,
         {
           amount: editAmount,
           notes: editNotes,

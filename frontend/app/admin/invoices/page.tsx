@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Calendar, Users, DollarSign, TrendingUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
 
 interface UploadResult {
   uploadId: string;
@@ -84,7 +84,7 @@ export default function AdminInvoicesPage() {
       formData.append('periodEnd', periodEnd);
       formData.append('uploadedBy', uploadedBy);
 
-      const response = await fetch(`${API_URL}/admin/invoices/upload`, {
+      const response = await fetch(`${API_URL}/api/admin/invoices/upload`, {
         method: 'POST',
         body: formData,
       });
