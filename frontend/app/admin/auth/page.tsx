@@ -29,9 +29,14 @@ export default function AdminAuthPage() {
         }
 
         // 2. Validar token con backend
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
         
-        const response = await fetch(`${API_URL}/admin/dashboard?token=${encodeURIComponent(token)}`);
+        const response = await fetch(`${API_URL}/api/admin/dashboard`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
         const data = await response.json();
 
         if (response.ok && data.success) {
