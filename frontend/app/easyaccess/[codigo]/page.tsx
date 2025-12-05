@@ -461,7 +461,7 @@ export default function LandingPage() {
               </h1>
               
               <p className="text-xl text-blue-100 mb-8">
-                La mejor conexión para tu hogar y negocio. Planes desde <strong className="text-white">$299/mes</strong> con velocidad garantizada.
+                La mejor conexión para tu hogar y negocio. Planes desde <strong className="text-white">$390/mes</strong> con velocidad garantizada.
               </p>
 
               <div className="flex flex-wrap gap-4 mb-8">
@@ -1061,12 +1061,18 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <button
-              onClick={contactWhatsApp}
-              className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
+              onClick={contactWispChat}
+              className="bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
             >
-              <MessageCircle className="w-12 h-12" />
-              <span>WhatsApp</span>
-              <span className="text-sm font-normal text-green-100">Respuesta inmediata</span>
+              <div className="w-16 h-16 bg-white rounded-full p-2 flex items-center justify-center">
+                <img 
+                  src="https://i.imgur.com/yKx8ZQY.png" 
+                  alt="WispChat Logo" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span>WispChat</span>
+              <span className="text-sm font-normal text-blue-100">ventas@easyaccessnet.com</span>
             </button>
 
             <button
@@ -1079,12 +1085,12 @@ export default function LandingPage() {
             </button>
 
             <button
-              onClick={contactWispChat}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
+              onClick={contactWhatsApp}
+              className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 rounded-xl font-bold transition-all transform hover:scale-105 flex flex-col items-center gap-3"
             >
               <MessageCircle className="w-12 h-12" />
-              <span>WispChat</span>
-              <span className="text-sm font-normal text-purple-100">ventas@easyaccessnet.com</span>
+              <span>WhatsApp</span>
+              <span className="text-sm font-normal text-green-100">Respuesta inmediata</span>
             </button>
           </div>
 
