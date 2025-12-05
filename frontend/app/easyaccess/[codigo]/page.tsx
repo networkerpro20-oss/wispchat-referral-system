@@ -24,57 +24,52 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
 
 interface Plan {
+  id: string;
   name: string;
+  slug: string;
   speed: string;
-  price: number;
+  speedDownload: number;
+  speedUpload: number | null;
+  price: string;
+  currency: string;
+  priceLabel: string | null;
+  popular: boolean;
+  badge: string | null;
   features: string[];
-  popular?: boolean;
+  maxDevices: number | null;
+  recommendedFor: string | null;
+  order: number;
+  active: boolean;
 }
 
-const plans: Plan[] = [
-  {
-    name: 'Básico',
-    speed: '20 Mbps',
-    price: 299,
-    features: [
-      'Ideal para navegación',
-      '2-3 dispositivos',
-      'Streaming SD',
-      'Redes sociales',
-      'Correo electrónico'
-    ]
-  },
-  {
-    name: 'Hogar',
-    speed: '50 Mbps',
-    price: 449,
-    popular: true,
-    features: [
-      'Perfecto para familias',
-      '4-6 dispositivos',
-      'Streaming HD',
-      'Gaming casual',
-      'Videollamadas',
-      'Home office'
-    ]
-  },
-  {
-    name: 'Premium',
-    speed: '100 Mbps',
-    price: 599,
-    features: [
-      'Máxima velocidad',
-      '8+ dispositivos',
-      'Streaming 4K',
-      'Gaming profesional',
-      'Smart home',
-      'Múltiples usuarios'
-    ]
-  }
-];
+interface Settings {
+  installationAmount: string;
+  monthlyAmount: string;
+  monthsToEarn: number;
+  currency: string;
+  promoActive: boolean;
+  promoName: string | null;
+  promoStartDate: string | null;
+  promoEndDate: string | null;
+  promoInstallAmount: string | null;
+  promoMonthlyAmount: string | null;
+  promoDescription: string | null;
+  promoDisplayBanner: boolean;
+  whatsappNumber: string;
+  whatsappMessage: string | null;
+  telegramUser: string | null;
+  telegramGroup: string | null;
+  phoneNumber: string | null;
+  supportEmail: string | null;
+  supportHours: string | null;
+  videoEnabled: boolean;
+  videoUrl: string | null;
+  videoTitle: string | null;
+  videoThumbnail: string | null;
+}
 
 const benefits = [
   {
@@ -152,6 +147,11 @@ export default function LandingPage() {
   const [referrerName, setReferrerName] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   const [checkingCoverage, setCheckingCoverage] = useState(false);
+  
+  // Dynamic data from API
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -170,11 +170,38 @@ export default function LandingPage() {
 
   useEffect(() => {
     validateReferralCode();
+    loadDynamicData();
   }, [referralCode]);
+
+  const loadDynamicData = async () => {
+    try {
+      setLoadingData(true);
+      
+      // Load plans and settings in parallel
+      const [plansRes, settingsRes] = await Promise.all([
+        fetch(`${API_URL}/api/plans`),
+        fetch(`${API_URL}/api/settings`)
+      ]);
+
+      if (plansRes.ok) {
+        const plansData = await plansRes.json();
+        setPlans(plansData.data || []);
+      }
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        setSettings(settingsData.data || null);
+      }
+    } catch (error) {
+      console.error('Error loading dynamic data:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const validateReferralCode = async () => {
     try {
-      const response = await fetch(`${API_URL}/referral-codes/${referralCode}/validate`);
+      const response = await fetch(`${API_URL}/api/referral-codes/${referralCode}/validate`);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -270,11 +297,20 @@ export default function LandingPage() {
   };
 
   const contactWhatsApp = () => {
-    window.open('https://wa.me/5215512345678?text=Hola!%20Me%20interesa%20contratar%20Easy%20Access', '_blank');
+    const whatsapp = settings?.whatsappNumber || '5215512345678';
+    const message = settings?.whatsappMessage || 'Hola! Me interesa contratar Easy Access';
+    window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const contactTelegram = () => {
-    window.open('https://t.me/easyaccesssoporte', '_blank');
+    const telegram = settings?.telegramUser || '@easyaccesssoporte';
+    if (telegram.startsWith('@')) {
+      window.open(`https://t.me/${telegram.substring(1)}`, '_blank');
+    } else if (telegram.startsWith('https://')) {
+      window.open(telegram, '_blank');
+    } else {
+      window.open(`https://t.me/${telegram}`, '_blank');
+    }
   };
 
   const contactWispChat = () => {
@@ -387,6 +423,24 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Promo Banner */}
+      {settings?.promoActive && settings?.promoDisplayBanner && (
+        <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white py-4 px-6">
+          <div className="max-w-7xl mx-auto text-center">
+            <div className="flex items-center justify-center gap-3">
+              <Sparkles className="w-6 h-6" />
+              <div>
+                <p className="font-bold text-lg">{settings.promoName}</p>
+                {settings.promoDescription && (
+                  <p className="text-sm opacity-90">{settings.promoDescription}</p>
+                )}
+              </div>
+              <Sparkles className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 text-white py-20 px-6">
         <div className="max-w-7xl mx-auto">
@@ -434,27 +488,38 @@ export default function LandingPage() {
             </div>
 
             <div>
-              {/* Video Institucional */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
-                  <div className="relative z-10 text-center">
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-white/30 transition-colors">
-                      <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                    </div>
-                    <p className="text-white font-semibold">Ver Video Institucional</p>
-                    <p className="text-blue-100 text-sm mt-1">Conoce Easy Access NewTelecom</p>
+              {/* Video Section - Dynamic */}
+              {settings?.videoEnabled && settings?.videoUrl ? (
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                  <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden">
+                    <iframe 
+                      src={settings.videoUrl}
+                      className="w-full h-full" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title={settings.videoTitle || 'Video institucional'}
+                    />
                   </div>
-                  {/* Para implementar video real:
-                  <iframe 
-                    src="https://www.youtube.com/embed/VIDEO_ID" 
-                    className="w-full h-full" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                  */}
+                  {settings.videoTitle && (
+                    <p className="text-center text-white font-semibold mt-3">
+                      {settings.videoTitle}
+                    </p>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                  <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
+                    <div className="relative z-10 text-center">
+                      <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Wifi className="w-10 h-10 text-white" />
+                      </div>
+                      <p className="text-white font-semibold">Internet Ultra Rápido</p>
+                      <p className="text-blue-100 text-sm mt-1">Easy Access NewTelecom</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -543,58 +608,73 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {plans.map((plan, index) => (
-              <div
-                key={index}
-                className={`bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all hover:scale-105 ${
-                  plan.popular ? 'ring-4 ring-purple-500 relative' : ''
-                }`}
-              >
-                {plan.popular && (
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center py-2 font-bold">
-                    <Sparkles className="w-4 h-4 inline mr-1" />
-                    MÁS POPULAR
-                  </div>
-                )}
-                
-                <div className="p-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {plan.name}
-                  </h3>
-                  <div className="mb-6">
-                    <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
-                    <span className="text-gray-600">/mes</span>
-                  </div>
-                  <div className="text-3xl font-bold text-blue-600 mb-6 flex items-center gap-2">
-                    <Wifi className="w-8 h-8" />
-                    {plan.speed}
-                  </div>
-                  
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={() => {
-                      setFormData({ ...formData, planSeleccionado: plan.name });
-                      document.getElementById('cobertura')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className={`w-full py-3 rounded-xl font-bold transition-all ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                    }`}
-                  >
-                    Contratar Ahora
-                  </button>
-                </div>
+            {loadingData ? (
+              <div className="col-span-3 flex justify-center py-20">
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
               </div>
-            ))}
+            ) : plans.length === 0 ? (
+              <div className="col-span-3 text-center py-20">
+                <p className="text-gray-600">No hay planes disponibles en este momento</p>
+              </div>
+            ) : (
+              plans.map((plan, index) => (
+                <div
+                  key={plan.id}
+                  className={`bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all hover:scale-105 ${
+                    plan.popular ? 'ring-4 ring-purple-500 relative' : ''
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center py-2 font-bold">
+                      <Sparkles className="w-4 h-4 inline mr-1" />
+                      MÁS POPULAR
+                    </div>
+                  )}
+                  {plan.badge && !plan.popular && (
+                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-center py-2 font-bold">
+                      {plan.badge}
+                    </div>
+                  )}
+                  
+                  <div className="p-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      {plan.name}
+                    </h3>
+                    <div className="mb-6">
+                      <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
+                      <span className="text-gray-600">/{plan.priceLabel || 'mes'}</span>
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mb-6 flex items-center gap-2">
+                      <Wifi className="w-8 h-8" />
+                      {plan.speed}
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      onClick={() => {
+                        setFormData({ ...formData, planSeleccionado: plan.name });
+                        document.getElementById('cobertura')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        plan.popular
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                      }`}
+                    >
+                      Contratar Ahora
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -912,7 +992,7 @@ export default function LandingPage() {
                     <div className="space-y-3">
                       {plans.map((plan) => (
                         <div
-                          key={plan.name}
+                          key={plan.id}
                           onClick={() => setFormData({ ...formData, planSeleccionado: plan.name })}
                           className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                             formData.planSeleccionado === plan.name
