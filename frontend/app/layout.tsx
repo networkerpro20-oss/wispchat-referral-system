@@ -1,7 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
-import AuthHandlerWrapper from '@/components/AuthHandlerWrapper'
 
 export const metadata: Metadata = {
   title: 'WispChat Referidos - Programa de Comisiones',
@@ -16,7 +15,6 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        <AuthHandlerWrapper />
         {children}
         <Toaster position="top-right" />
       </body>
