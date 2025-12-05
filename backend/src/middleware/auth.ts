@@ -27,14 +27,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Verificar token
     const decoded = jwt.verify(token, config.wispchatJwtSecret) as JWTPayload;
 
-    // Agregar usuario al request (convertir rol → role)
+    // Agregar usuario al request
     req.user = {
       id: decoded.userId,
       email: decoded.email,
-      role: decoded.rol,  // ← Leer "rol" del token, asignar como "role"
+      rol: decoded.rol,
       tenantId: decoded.tenantId,
       tenantDomain: decoded.tenantDomain,
-    } as User;  // ← Cast explícito para evitar error TS
+    } as User;
 
     next();
   } catch (error: any) {
@@ -68,7 +68,7 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
     });
   }
 
-  if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+  if (req.user.rol !== 'admin' && req.user.rol !== 'staff') {
     return res.status(403).json({
       success: false,
       message: 'Insufficient permissions',

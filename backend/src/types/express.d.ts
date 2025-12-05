@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   email: string;
-  role: string;
+  rol: string;
   tenantId: string;
   tenantDomain: string;
 }
