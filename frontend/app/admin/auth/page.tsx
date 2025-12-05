@@ -30,8 +30,13 @@ export default function AdminAuthPage() {
 
         // 2. Validar token con backend
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        console.log('🔍 Validando token con:', API_URL);
+        console.log('🔑 Token:', token?.substring(0, 50) + '...');
         
-        const response = await fetch(`${API_URL}/api/admin/dashboard`, {
+        const fullUrl = `${API_URL}/api/admin/dashboard`;
+        console.log('📡 URL completa:', fullUrl);
+        
+        const response = await fetch(fullUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -60,13 +65,15 @@ export default function AdminAuthPage() {
         } else {
           // Token inválido
           setStatus('error');
-          setMessage(data.error?.message || 'Token inválido o expirado');
+          const errorMsg = data.message || data.error?.message || 'Token inválido o expirado';
+          setMessage(`${errorMsg} (Status: ${response.status})`);
+          console.error('Auth failed:', { status: response.status, data, API_URL });
         }
 
       } catch (error: any) {
         console.error('Error validando token:', error);
         setStatus('error');
-        setMessage('Error de conexión. Intenta nuevamente.');
+        setMessage(`Error: ${error.message || 'Error de conexión'}`);
       }
     };
 
