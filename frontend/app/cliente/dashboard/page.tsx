@@ -33,6 +33,14 @@ interface ReferralInfo {
     status: string;
     installedAt: string;
   }>;
+}
+
+interface Settings {
+  installationAmount: number;
+  monthlyAmount: number;
+  monthsToEarn: number;
+  currency: string;
+}
   commissions: Array<{
     id: string;
     type: string;
@@ -42,12 +50,15 @@ interface ReferralInfo {
   }>;
 }
 
+}
+
 export default function ClienteDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReferralInfo | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
     loadReferralData();
@@ -62,6 +73,14 @@ export default function ClienteDashboard() {
       }
 
       const API_URL = 'https://wispchat-backend.onrender.com/api/v1';
+      const REFERRAL_API = 'https://wispchat-referral-backend.onrender.com/api/v1';
+      
+      // Cargar settings en paralelo
+      const settingsResponse = await fetch(`${REFERRAL_API}/settings/public`);
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        setSettings(settingsData.data);
+      }
       const response = await fetch(`${API_URL}/referrals/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -246,11 +265,11 @@ export default function ClienteDashboard() {
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-green-100 mb-1">Instalación</p>
-              <p className="text-xl font-bold">$500</p>
+              <p className="text-xl font-bold">${settings?.installationAmount || 200}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-green-100 mb-1">Mensual (6 meses)</p>
-              <p className="text-xl font-bold">$50/mes</p>
+              <p className="text-xl font-bold">${settings?.monthlyAmount || 50}/mes</p>
             </div>
           </div>
         </div>
