@@ -39,6 +39,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/clients', clientRoutes);      // Rutas para clientes
+app.use('/api/client', clientRoutes);       // Ruta singular para registro desde WispChat
 app.use('/api/leads', leadRoutes);          // Rutas para leads (público)
 app.use('/api/admin', adminRoutes);         // Rutas para admin
 app.use('/api/settings', settingsRoutes);   // Settings (público + admin)

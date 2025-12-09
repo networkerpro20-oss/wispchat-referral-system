@@ -8,6 +8,59 @@ import leadService from '../services/leadService';
  */
 class ClientController {
   /**
+   * Registrar cliente desde WispChat
+   * POST /api/client/register
+   */
+  async registerClient(req: Request, res: Response) {
+    try {
+      const {
+        wispChatClientId,
+        wispChatUserId,
+        nombre,
+        email,
+        telefono,
+      } = req.body;
+
+      // Validar campos requeridos
+      if (!wispChatClientId || !nombre || !email) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_FIELDS',
+            message: 'Faltan campos requeridos: wispChatClientId, nombre, email',
+          },
+        });
+      }
+
+      const client = await clientService.autoRegisterFromWispChat({
+        wispChatClientId,
+        wispChatUserId,
+        nombre,
+        email,
+        telefono,
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          referralCode: client.referralCode,
+          shareUrl: client.shareUrl,
+          message: 'Cliente registrado exitosamente en programa de referidos',
+        },
+      });
+    } catch (error: any) {
+      console.error('Error registering client:', error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'REGISTRATION_ERROR',
+          message: error.message || 'Error al registrar cliente',
+        },
+      });
+    }
+  }
+
+  /**
    * Obtener información del cliente por número de WispHub
    * GET /api/clients/:wispHubId
    */

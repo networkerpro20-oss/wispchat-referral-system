@@ -4,6 +4,12 @@ import clientController from '../controllers/clientController';
 const router = Router();
 
 /**
+ * POST /api/client/register
+ * Registrar cliente desde WispChat (auto-registro)
+ */
+router.post('/register', clientController.registerClient);
+
+/**
  * GET /api/clients/:wispHubId
  * Obtener información del cliente
  */
