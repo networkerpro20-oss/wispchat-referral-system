@@ -59,6 +59,75 @@ class ClientController {
       });
     }
   }
+  /**
+   * Obtener cliente por wispChatClientId
+   * GET /api/client/by-wispchat/:wispChatClientId
+   */
+  async getByWispChatId(req: Request, res: Response) {
+    try {
+      const { wispChatClientId } = req.params;
+
+      if (!wispChatClientId) {
+        return res.status(400).json({
+          success: false,
+          message: 'wispChatClientId es requerido',
+        });
+      }
+
+      const client = await clientService.getByWispChatId(wispChatClientId);
+
+      // Calcular shareUrl completo
+      const shareUrl = `${process.env.FRONTEND_URL || 'https://referidos.wispchat.net'}${client.shareUrl}`;
+
+      return res.json({
+        success: true,
+        data: {
+          id: client.id,
+          wispChatClientId: client.wispChatClientId,
+          nombre: client.nombre,
+          email: client.email,
+          referralCode: client.referralCode,
+          shareUrl,
+          active: true,
+          totalEarned: Number(client.totalEarned || 0),
+          totalApplied: Number(client.totalApplied || 0),
+          totalReferrals: client.totalReferrals,
+          referrals: client.referrals?.map((r: any) => ({
+            id: r.id,
+            nombre: r.nombre,
+            telefono: r.telefono,
+            email: r.email,
+            status: r.status,
+            installedAt: r.installedAt,
+            createdAt: r.createdAt,
+          })) || [],
+          commissions: client.commissions?.map((c: any) => ({
+            id: c.id,
+            type: c.type,
+            amount: Number(c.amount),
+            status: c.status,
+            createdAt: c.createdAt,
+          })) || [],
+        },
+      });
+    } catch (error: any) {
+      console.error('Error getting client by wispChatId:', error);
+      
+      // Si no existe, retornar 404
+      if (error.message === 'Cliente no encontrado') {
+        return res.status(404).json({
+          success: false,
+          message: 'Cliente no encontrado',
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Error al obtener información del cliente',
+      });
+    }
+  }
+
 
   /**
    * Obtener información del cliente por número de WispHub

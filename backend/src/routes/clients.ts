@@ -10,6 +10,12 @@ const router = Router();
 router.post('/register', clientController.registerClient);
 
 /**
+ * GET /api/client/by-wispchat/:wispChatClientId
+ * Obtener cliente por wispChatClientId
+ */
+router.get('/by-wispchat/:wispChatClientId', clientController.getByWispChatId);
+
+/**
  * GET /api/clients/:wispHubId
  * Obtener información del cliente
  */
