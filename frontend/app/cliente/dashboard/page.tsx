@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -33,14 +34,6 @@ interface ReferralInfo {
     status: string;
     installedAt: string;
   }>;
-}
-
-interface Settings {
-  installationAmount: number;
-  monthlyAmount: number;
-  monthsToEarn: number;
-  currency: string;
-}
   commissions: Array<{
     id: string;
     type: string;
@@ -50,6 +43,12 @@ interface Settings {
   }>;
 }
 
+interface Settings {
+  installationAmount: number;
+  monthlyAmount: number;
+  monthsToEarn: number;
+  currency: string;
+}
 
 export default function ClienteDashboard() {
   const router = useRouter();
