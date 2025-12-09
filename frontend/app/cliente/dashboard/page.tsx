@@ -73,7 +73,11 @@ export default function ClienteDashboard() {
       if (response.ok) {
         const result = await response.json();
         setData(result.data);
-        setShareUrl(result.data.shareUrl || `https://referidos.wispchat.net/easyaccess/${result.data.referralCode}`);
+        // Si shareUrl es solo el path, agregar el dominio
+        const fullShareUrl = result.data.shareUrl?.startsWith("http") 
+          ? result.data.shareUrl 
+          : `https://referidos.wispchat.net${result.data.shareUrl || `/easyaccess/${result.data.referralCode}`}`;
+        setShareUrl(fullShareUrl);
       } else {
         throw new Error('No se pudo cargar la información');
       }

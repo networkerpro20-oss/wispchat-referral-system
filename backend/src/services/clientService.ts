@@ -23,7 +23,7 @@ async function autoRegisterFromWispChat(data: {
 
   // Generar código único EASY-XXXXX
   const codigo = await generateUniqueCode();
-  const shareUrl = `${process.env.FRONTEND_URL || 'https://referidos.wispchat.net'}/easyaccess/${codigo}`;
+  const shareUrl = `/easyaccess/${codigo}`;
 
   // Crear cliente
   const client = await prisma.client.create({
