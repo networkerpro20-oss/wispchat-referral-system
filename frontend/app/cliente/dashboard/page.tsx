@@ -50,7 +50,6 @@ interface Settings {
   }>;
 }
 
-}
 
 export default function ClienteDashboard() {
   const router = useRouter();
