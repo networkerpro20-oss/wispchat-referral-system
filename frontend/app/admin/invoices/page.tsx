@@ -78,6 +78,12 @@ export default function AdminInvoicesPage() {
     setResult(null);
 
     try {
+      const token = localStorage.getItem('referral_auth_token');
+      if (!token) {
+        toast.error('Sesión expirada. Por favor inicia sesión nuevamente.');
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('periodStart', periodStart);
@@ -86,6 +92,9 @@ export default function AdminInvoicesPage() {
 
       const response = await fetch(`${API_URL}/api/admin/invoices/upload`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
 
