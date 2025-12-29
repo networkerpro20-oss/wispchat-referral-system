@@ -3,6 +3,7 @@ import commissionService from '../services/commissionService';
 import clientService from '../services/clientService';
 import leadService from '../services/leadService';
 import invoiceService from '../services/invoiceService';
+import clientImportService from '../services/clientImportService';
 import prisma from '../lib/prisma';
 import multer from 'multer';
 import path from 'path';
@@ -644,6 +645,39 @@ class AdminController {
       });
     } catch (error: any) {
       res.status(400).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Subir CSV de clientes (EAClientes)
+   * POST /api/admin/clients/upload
+   */
+  async uploadClientsCSV(req: Request, res: Response) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No se subió ningún archivo' },
+        });
+      }
+
+      const uploadedBy = req.body.uploadedBy || 'admin';
+
+      const result = await clientImportService.importClientsCSV({
+        filePath: req.file.path,
+        fileName: req.file.originalname,
+        uploadedBy,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(500).json({
         success: false,
         error: { message: error.message },
       });

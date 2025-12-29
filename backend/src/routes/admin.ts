@@ -60,6 +60,12 @@ router.put('/leads/:id/status', adminController.updateLeadStatus);
 router.post('/invoices/upload', adminController.uploadMiddleware, adminController.uploadInvoicesCSV);
 
 /**
+ * POST /api/admin/clients/upload
+ * Subir CSV de clientes (EAClientes) para importar/actualizar
+ */
+router.post('/clients/upload', adminController.uploadMiddleware, adminController.uploadClientsCSV);
+
+/**
  * GET /api/admin/invoices/uploads
  * Listar uploads de CSV
  */
