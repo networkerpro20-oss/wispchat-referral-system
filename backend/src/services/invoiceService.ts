@@ -154,9 +154,16 @@ class InvoiceService {
           const status = isPaid ? 'PAID' : isEnRevision ? 'PENDING' : 'PENDING';
           const clientId = String(idServicio).trim();
 
-        // Verificar si es cliente referidor
-        const isReferrer = await prisma.client.findUnique({
-          where: { wispChatClientId: clientId },
+        // Verificar si es cliente referidor (buscar con diferentes formatos de ID)
+        const clientId = String(idServicio).trim();
+        const isReferrer = await prisma.client.findFirst({
+          where: {
+            OR: [
+              { wispChatClientId: clientId },
+              { wispChatClientId: `WISPHUB_${clientId}` },
+              { wispChatClientId: { endsWith: `_${clientId}` } }
+            ]
+          },
         });
 
         // Verificar si es referido instalado

@@ -96,9 +96,16 @@ class ClientImportService {
             continue;
           }
 
-          // Buscar cliente existente por wispChatClientId
-          const existingClient = await prisma.client.findUnique({
-            where: { wispChatClientId: idServicio }
+          // Buscar cliente existente por wispChatClientId (con o sin prefijo)
+          const searchId = String(idServicio).trim();
+          let existingClient = await prisma.client.findFirst({
+            where: {
+              OR: [
+                { wispChatClientId: searchId },
+                { wispChatClientId: `WISPHUB_${searchId}` },
+                { wispChatClientId: { endsWith: `_${searchId}` } }
+              ]
+            }
           });
 
           // Determinar si está activo basado en el estado
