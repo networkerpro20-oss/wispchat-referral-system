@@ -140,8 +140,14 @@ class InvoiceService {
           const invoiceDate = this.parseDate(fechaEmision);
           const dueDate = this.parseDate(fechaVencimiento);
           // Verificar si está pagada - buscar variaciones
-          const estadoLower = (estado || '').toLowerCase();
-          const isPaid = estadoLower.includes('pagad') || estadoLower === 'paid' || estadoLower === 'pago';
+          const estadoLower = (estado || '').toLowerCase().trim();
+          const isPaid = estadoLower === 'pagada' || 
+                        estadoLower === 'pagado' ||
+                        estadoLower.includes('pagad') || 
+                        estadoLower === 'paid' || 
+                        estadoLower === 'pago' ||
+                        estadoLower === 'completado' ||
+                        estadoLower === 'completed';
           const status = isPaid ? 'PAID' : 'PENDING';
           const clientId = String(idServicio).trim();
 
