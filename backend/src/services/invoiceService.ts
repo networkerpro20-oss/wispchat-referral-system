@@ -155,7 +155,6 @@ class InvoiceService {
           const clientId = String(idServicio).trim();
 
         // Verificar si es cliente referidor (buscar con diferentes formatos de ID)
-        const clientId = String(idServicio).trim();
         const isReferrer = await prisma.client.findFirst({
           where: {
             OR: [
