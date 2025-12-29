@@ -29,11 +29,12 @@ export default function AdminAuthPage() {
         }
 
         // 2. Validar token con backend
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-        console.log('🔍 Validando token con:', API_URL);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
+        const baseUrl = API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
+        console.log('🔍 Validando token con:', baseUrl);
         console.log('🔑 Token:', token?.substring(0, 50) + '...');
         
-        const fullUrl = `${API_URL}/api/admin/dashboard`;
+        const fullUrl = `${baseUrl}/api/admin/dashboard`;
         console.log('📡 URL completa:', fullUrl);
         
         const response = await fetch(fullUrl, {

@@ -24,7 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com/api';
+import { API_URL } from '@/lib/apiConfig';
 
 interface Referral {
   id: string;

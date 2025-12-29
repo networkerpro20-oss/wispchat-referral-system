@@ -5,7 +5,7 @@ import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Users, FileUp, Dat
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
+import { API_URL } from '@/lib/apiConfig';
 
 type UploadType = 'clients' | 'invoices';
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Calendar, Users, DollarSign, TrendingUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
+import { API_URL } from '@/lib/apiConfig';
 
 interface UploadResult {
   uploadId: string;

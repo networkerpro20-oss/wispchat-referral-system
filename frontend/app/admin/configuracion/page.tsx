@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Loader2, CheckCircle, XCircle, DollarSign, Calendar, Phone, Video } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
+import { API_URL } from '@/lib/apiConfig';
 
 interface Settings {
   installationAmount: string;
