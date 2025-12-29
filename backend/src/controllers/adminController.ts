@@ -102,6 +102,300 @@ class AdminController {
   }
 
   /**
+   * Dashboard extendido con más métricas
+   * GET /api/admin/dashboard-extended
+   */
+  async getDashboardExtended(req: Request, res: Response) {
+    try {
+      const now = new Date();
+      const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      const [
+        totalClients,
+        clientsWithReferrals,
+        clientsPaymentCurrent,
+        clientsPaymentOverdue,
+        totalLeads,
+        pendingLeads,
+        contactedLeads,
+        installedLeads,
+        rejectedLeads,
+        leadsThisMonth,
+        leadsLastMonth,
+        totalCommissions,
+        earnedCommissions,
+        activeCommissions,
+        appliedCommissions,
+        cancelledCommissions,
+        totalAmount,
+        activeAmount,
+        appliedAmount,
+        recentLeads,
+        topReferrers,
+      ] = await Promise.all([
+        // Clientes
+        prisma.client.count({ where: { active: true } }),
+        prisma.client.count({ where: { active: true, totalReferrals: { gt: 0 } } }),
+        prisma.client.count({ where: { active: true, isPaymentCurrent: true } }),
+        prisma.client.count({ where: { active: true, isPaymentCurrent: false } }),
+        // Leads
+        prisma.referral.count(),
+        prisma.referral.count({ where: { status: 'PENDING' } }),
+        prisma.referral.count({ where: { status: 'CONTACTED' } }),
+        prisma.referral.count({ where: { status: 'INSTALLED' } }),
+        prisma.referral.count({ where: { status: 'REJECTED' } }),
+        prisma.referral.count({ where: { createdAt: { gte: firstDayThisMonth } } }),
+        prisma.referral.count({ 
+          where: { 
+            createdAt: { gte: firstDayLastMonth, lte: lastDayLastMonth } 
+          } 
+        }),
+        // Comisiones
+        prisma.commission.count(),
+        prisma.commission.count({ where: { status: 'EARNED' } }),
+        prisma.commission.count({ where: { status: 'ACTIVE' } }),
+        prisma.commission.count({ where: { status: 'APPLIED' } }),
+        prisma.commission.count({ where: { status: 'CANCELLED' } }),
+        prisma.commission.aggregate({ _sum: { amount: true } }),
+        prisma.commission.aggregate({ where: { status: 'ACTIVE' }, _sum: { amount: true } }),
+        prisma.commission.aggregate({ where: { status: 'APPLIED' }, _sum: { amount: true } }),
+        // Leads recientes
+        prisma.referral.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            client: { select: { nombre: true } }
+          }
+        }),
+        // Top referidores
+        prisma.client.findMany({
+          where: { totalReferrals: { gt: 0 } },
+          orderBy: { totalReferrals: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            nombre: true,
+            referralCode: true,
+            totalReferrals: true,
+            totalEarned: true
+          }
+        })
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          clients: {
+            total: totalClients,
+            withReferrals: clientsWithReferrals,
+            paymentCurrent: clientsPaymentCurrent,
+            paymentOverdue: clientsPaymentOverdue,
+          },
+          leads: {
+            total: totalLeads,
+            pending: pendingLeads,
+            contacted: contactedLeads,
+            installed: installedLeads,
+            rejected: rejectedLeads,
+            thisMonth: leadsThisMonth,
+            lastMonth: leadsLastMonth,
+          },
+          commissions: {
+            total: totalCommissions,
+            earned: earnedCommissions,
+            active: activeCommissions,
+            applied: appliedCommissions,
+            cancelled: cancelledCommissions,
+            totalAmount: Number(totalAmount._sum.amount) || 0,
+            activeAmount: Number(activeAmount._sum.amount) || 0,
+            appliedAmount: Number(appliedAmount._sum.amount) || 0,
+          },
+          recentLeads: recentLeads.map(lead => ({
+            id: lead.id,
+            nombre: lead.nombre,
+            telefono: lead.telefono,
+            status: lead.status,
+            createdAt: lead.createdAt,
+            clientName: lead.client.nombre
+          })),
+          topReferrers: topReferrers.map(ref => ({
+            id: ref.id,
+            nombre: ref.nombre,
+            referralCode: ref.referralCode,
+            totalReferrals: ref.totalReferrals,
+            totalEarned: Number(ref.totalEarned)
+          }))
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Listar clientes con sus referidos
+   * GET /api/admin/clients-with-referrals
+   */
+  async getClientsWithReferrals(req: Request, res: Response) {
+    try {
+      const clients = await prisma.client.findMany({
+        where: { active: true },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          referrals: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              commissions: {
+                select: {
+                  type: true,
+                  amount: true,
+                  status: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        data: clients.map(client => ({
+          id: client.id,
+          wispChatClientId: client.wispChatClientId,
+          nombre: client.nombre,
+          email: client.email,
+          telefono: client.telefono,
+          referralCode: client.referralCode,
+          shareUrl: client.shareUrl,
+          isPaymentCurrent: client.isPaymentCurrent,
+          lastInvoiceStatus: client.lastInvoiceStatus,
+          totalReferrals: client.totalReferrals,
+          totalEarned: Number(client.totalEarned),
+          totalActive: Number(client.totalActive),
+          totalApplied: Number(client.totalApplied),
+          active: client.active,
+          createdAt: client.createdAt,
+          referrals: client.referrals.map(ref => ({
+            id: ref.id,
+            nombre: ref.nombre,
+            telefono: ref.telefono,
+            email: ref.email,
+            direccion: ref.direccion,
+            status: ref.status,
+            fechaContacto: ref.fechaContacto,
+            fechaInstalacion: ref.fechaInstalacion,
+            createdAt: ref.createdAt,
+            commissions: ref.commissions.map(comm => ({
+              type: comm.type,
+              amount: Number(comm.amount),
+              status: comm.status
+            }))
+          }))
+        }))
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Ver detalle de un lead
+   * GET /api/admin/leads/:id
+   */
+  async getLeadDetail(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const lead = await prisma.referral.findUnique({
+        where: { id },
+        include: {
+          client: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              referralCode: true,
+              isPaymentCurrent: true
+            }
+          },
+          commissions: {
+            orderBy: { createdAt: 'asc' },
+            select: {
+              id: true,
+              type: true,
+              amount: true,
+              status: true,
+              monthNumber: true,
+              createdAt: true
+            }
+          }
+        }
+      });
+
+      if (!lead) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Lead no encontrado' }
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          ...lead,
+          commissions: lead.commissions.map(c => ({
+            ...c,
+            amount: Number(c.amount)
+          }))
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Agregar nota a un lead
+   * POST /api/admin/leads/:id/note
+   */
+  async addLeadNote(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { note } = req.body;
+
+      if (!note) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'La nota es requerida' }
+        });
+      }
+
+      const referral = await leadService.addNote(id, note);
+
+      res.json({
+        success: true,
+        data: referral
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
    * Listar leads con filtros
    * GET /api/admin/leads
    */

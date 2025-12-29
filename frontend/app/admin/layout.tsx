@@ -3,7 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Upload, FileText, TrendingUp, LogOut, Loader2, Settings, Package } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Upload, 
+  FileText, 
+  TrendingUp, 
+  LogOut, 
+  Loader2, 
+  Settings, 
+  Package,
+  Users,
+  DollarSign
+} from 'lucide-react';
 
 export default function AdminLayout({
   children,
@@ -101,9 +112,14 @@ export default function AdminLayout({
 
   const navItems = [
     {
-      href: '/admin',
+      href: '/admin/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      href: '/admin/clientes',
+      label: 'Clientes',
+      icon: Users,
     },
     {
       href: '/admin/invoices',
@@ -128,8 +144,8 @@ export default function AdminLayout({
   ];
 
   const isActive = (href: string) => {
-    if (href === '/admin') {
-      return pathname === href;
+    if (href === '/admin/dashboard') {
+      return pathname === href || pathname === '/admin';
     }
     return pathname?.startsWith(href);
   };

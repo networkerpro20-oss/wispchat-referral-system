@@ -18,6 +18,30 @@ router.use(requireAdmin);
 router.get('/dashboard', adminController.getDashboard);
 
 /**
+ * GET /api/admin/dashboard-extended
+ * Dashboard extendido con más métricas y datos
+ */
+router.get('/dashboard-extended', adminController.getDashboardExtended);
+
+/**
+ * GET /api/admin/clients-with-referrals
+ * Listar clientes con sus referidos anidados
+ */
+router.get('/clients-with-referrals', adminController.getClientsWithReferrals);
+
+/**
+ * GET /api/admin/leads/:id
+ * Ver detalle de un lead específico
+ */
+router.get('/leads/:id', adminController.getLeadDetail);
+
+/**
+ * POST /api/admin/leads/:id/note
+ * Agregar nota a un lead
+ */
+router.post('/leads/:id/note', adminController.addLeadNote);
+
+/**
  * GET /api/admin/leads
  * Listar leads (referidos)
  */
