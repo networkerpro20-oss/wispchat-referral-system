@@ -77,13 +77,31 @@ class InvoiceService {
       console.log('📝 PASO 1: Procesando facturas...\n');
       let paidCount = 0;
       let pendingCount = 0;
+      const errors: string[] = [];
 
       for (const row of records) {
-        const invoiceDate = this.parseDate(row['Fecha Emisión']);
-        const dueDate = this.parseDate(row['Fecha Vencimiento']);
-        const isPaid = row['Estado'].toLowerCase().includes('pagada');
-        const status = isPaid ? 'PAID' : 'PENDING';
-        const clientId = row['ID Servicio'].trim();
+        try {
+          // Obtener valores con fallback para diferentes formatos de CSV
+          const estado = row['Estado'] || row['estado'] || '';
+          const idServicio = row['ID Servicio'] || row['ID_Servicio'] || row['id_servicio'] || '';
+          const factura = row['#Factura'] || row['Factura'] || row['factura'] || '';
+          const cliente = row['Cliente'] || row['cliente'] || '';
+          const fechaEmision = row['Fecha Emisión'] || row['Fecha_Emision'] || row['fecha_emision'] || '';
+          const fechaVencimiento = row['Fecha Vencimiento'] || row['Fecha_Vencimiento'] || '';
+          const total = row['Total'] || row['total'] || '0';
+
+          // Validar campos requeridos
+          if (!idServicio) {
+            console.log(`⚠️ Factura sin ID Servicio: ${factura || 'N/A'}`);
+            errors.push(`Factura ${factura || 'N/A'} sin ID Servicio`);
+            continue;
+          }
+
+          const invoiceDate = this.parseDate(fechaEmision);
+          const dueDate = this.parseDate(fechaVencimiento);
+          const isPaid = estado.toLowerCase().includes('pagad') || estado.toLowerCase() === 'paid';
+          const status = isPaid ? 'PAID' : 'PENDING';
+          const clientId = idServicio.trim();
 
         // Verificar si es cliente referidor
         const isReferrer = await prisma.client.findUnique({
@@ -102,11 +120,11 @@ class InvoiceService {
           data: {
             uploadId: upload.id,
             wispChatClientId: clientId,
-            wispChatInvoiceId: row['#Factura'],
-            clientName: row['Cliente'],
+            wispChatInvoiceId: factura,
+            clientName: cliente,
             invoiceDate,
             dueDate,
-            amount: new Decimal(row['Total'] || '0'),
+            amount: new Decimal(total.replace(/[,$]/g, '') || '0'),
             status,
             isReferrer: !!isReferrer,
             isReferral: !!isReferral,
@@ -118,7 +136,11 @@ class InvoiceService {
 
         const icon = status === 'PAID' ? '✅' : '⏳';
         const type = isReferrer ? ' [REFERIDOR]' : isReferral ? ' [REFERIDO]' : '';
-        console.log(`  ${icon} #${row['#Factura']} - ${row['Cliente']}${type} - $${row['Total']}`);
+        console.log(`  ${icon} #${factura} - ${cliente}${type} - $${total}`);
+        } catch (rowError: any) {
+          console.error(`❌ Error procesando fila:`, rowError.message);
+          errors.push(`Error en fila: ${rowError.message}`);
+        }
       }
 
       await prisma.invoiceUpload.update({
@@ -153,12 +175,15 @@ class InvoiceService {
       console.log(`${'='.repeat(60)}\n`);
 
       return {
-        upload,
-        totalInvoices: records.length,
-        paidInvoices: paidCount,
-        pendingInvoices: pendingCount,
-        commissionsGenerated: stats.generated,
-        commissionsActivated: stats.activated,
+        uploadId: upload.id,
+        stats: {
+          totalInvoices: records.length,
+          referrerInvoices: paidCount,
+          referralInvoices: pendingCount,
+          commissionsGenerated: stats.generated,
+          commissionsActivated: stats.activated,
+          errors: errors,
+        }
       };
     } catch (error: any) {
       console.error('❌ Error procesando CSV:', error.message);
