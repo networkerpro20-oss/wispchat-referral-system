@@ -5,21 +5,20 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
 
 /**
- * Obtener URL base de la API
- * Asegura que siempre termine con /api
+ * Obtener URL base de la API (sin /api al final)
+ * Las rutas deben incluir /api si es necesario
  */
-export const getApiUrl = (): string => {
+export const getBaseUrl = (): string => {
   let base = BASE_URL.replace(/\/+$/, ''); // Quitar slash final
-  if (!base.endsWith('/api')) {
-    base = `${base}/api`;
-  }
+  // Quitar /api si está presente para evitar duplicación
+  base = base.replace(/\/api$/, '');
   return base;
 };
 
 /**
- * URL base de la API
+ * URL base de la API (incluye /api)
  */
-export const API_URL = getApiUrl();
+export const API_URL = `${getBaseUrl()}/api`;
 
 /**
  * Helper para hacer fetch con auth

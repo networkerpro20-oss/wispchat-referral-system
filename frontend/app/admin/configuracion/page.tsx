@@ -49,7 +49,7 @@ export default function ConfiguracionPage() {
       setLoading(true);
       const token = localStorage.getItem('referral_auth_token');
       
-      const response = await fetch(`${API_URL}/api/settings/admin`, {
+      const response = await fetch(`${API_URL}/settings/admin`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -75,7 +75,7 @@ export default function ConfiguracionPage() {
       setSaving(true);
       const token = localStorage.getItem('referral_auth_token');
 
-      const response = await fetch(`${API_URL}/api/settings/admin`, {
+      const response = await fetch(`${API_URL}/settings/admin`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

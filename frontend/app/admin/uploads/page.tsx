@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Calendar, User, TrendingUp, RefreshCw, Eye, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wispchat-referral-backend.onrender.com';
+import { API_URL } from '@/lib/apiConfig';
 
 interface InvoiceUpload {
   id: string;
@@ -47,7 +46,7 @@ export default function AdminUploadsPage() {
 
   const fetchUploads = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/invoices/uploads`);
+      const response = await fetch(`${API_URL}/admin/invoices/uploads`);
       const data = await response.json();
       
       if (data.success) {
@@ -65,7 +64,7 @@ export default function AdminUploadsPage() {
 
   const fetchUploadDetails = async (uploadId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/invoices/uploads/${uploadId}`);
+      const response = await fetch(`${API_URL}/admin/invoices/uploads/${uploadId}`);
       const data = await response.json();
       
       if (data.success) {
@@ -87,7 +86,7 @@ export default function AdminUploadsPage() {
 
     setReprocessing(uploadId);
     try {
-      const response = await fetch(`${API_URL}/api/admin/invoices/uploads/${uploadId}/reprocess`, {
+      const response = await fetch(`${API_URL}/admin/invoices/uploads/${uploadId}/reprocess`, {
         method: 'POST',
       });
       const data = await response.json();

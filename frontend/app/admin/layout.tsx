@@ -122,7 +122,7 @@ export default function AdminLayout({
       icon: Users,
     },
     {
-      href: '/admin/invoices',
+      href: '/admin/upload',
       label: 'Subir CSV',
       icon: Upload,
     },
