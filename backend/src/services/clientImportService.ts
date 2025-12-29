@@ -61,6 +61,11 @@ class ClientImportService {
         return '';
       };
 
+      // Log primera fila para debug
+      if (records.length > 0) {
+        console.log('🔍 Primera fila (debug):', JSON.stringify(records[0], null, 2));
+      }
+
       let created = 0;
       let updated = 0;
       let skipped = 0;
@@ -68,21 +73,24 @@ class ClientImportService {
 
       for (const row of records) {
         try {
-          // Mapear campos - buscar por diferentes nombres posibles
-          const idServicio = findColumn(row, ['ID Servicio', 'ID', 'id_servicio', 'servicio', 'ID Cliente']);
-          const nombre = findColumn(row, ['Cliente', 'Nombre', 'nombre', 'client']);
+          // Mapear campos del CSV de EAClientes
+          // Columnas: ID, Nombre, Servicio, Ip, Estado, Plan Internet, Dirección, Telefono...
+          const idServicio = findColumn(row, ['ID', 'id', 'ID Servicio', 'id_servicio']);
+          const nombre = findColumn(row, ['Nombre', 'nombre', 'Cliente', 'client']);
+          const servicio = findColumn(row, ['Servicio', 'servicio']); // Nombre del servicio
           const email = findColumn(row, ['Email', 'email', 'correo', 'Correo']);
           const telefono = findColumn(row, ['Telefono', 'telefono', 'phone', 'Tel']);
-          const usuario = findColumn(row, ['Usuario', 'usuario', 'user']);
+          const ip = findColumn(row, ['Ip', 'IP', 'ip']);
+          const estado = findColumn(row, ['Estado', 'estado', 'status']);
+          const planInternet = findColumn(row, ['Plan Internet', 'Plan', 'plan']);
 
-          // Validar campos requeridos
           if (!idServicio) {
-            errors.push(`Registro sin ID Servicio: ${nombre || 'N/A'}`);
+            errors.push(`Registro sin ID: ${nombre || servicio || 'N/A'}`);
             skipped++;
             continue;
           }
 
-          if (!nombre) {
+          if (!nombre && !servicio) {
             errors.push(`Registro sin nombre: ID ${idServicio}`);
             skipped++;
             continue;
@@ -93,18 +101,22 @@ class ClientImportService {
             where: { wispChatClientId: idServicio }
           });
 
+          // Determinar si está activo basado en el estado
+          const isActive = estado.toLowerCase() === 'activo';
+
           if (existingClient) {
             // Actualizar cliente existente
             await prisma.client.update({
               where: { id: existingClient.id },
               data: {
-                nombre: nombre,
+                nombre: nombre || servicio || existingClient.nombre,
                 email: email || existingClient.email,
                 telefono: telefono || existingClient.telefono,
+                active: isActive,
               }
             });
             updated++;
-            console.log(`🔄 Actualizado: ${nombre} (ID: ${idServicio})`);
+            console.log(`🔄 Actualizado: ${nombre || servicio} (ID: ${idServicio}) - ${isActive ? 'Activo' : 'Inactivo'}`);
           } else {
             // Crear nuevo cliente
             // Generar código de referido único
@@ -113,17 +125,17 @@ class ClientImportService {
             await prisma.client.create({
               data: {
                 wispChatClientId: idServicio,
-                nombre: nombre,
-                email: email || `${usuario || idServicio}@easy-access.net`,
+                nombre: nombre || servicio || `Cliente ${idServicio}`,
+                email: email || `cliente${idServicio}@easy-access.net`,
                 telefono: telefono,
                 referralCode: referralCode,
                 shareUrl: `https://referidos.wispchat.net/registro/${referralCode}`,
-                active: true,
+                active: isActive,
                 isPaymentCurrent: true, // Por defecto al día hasta que se procese facturas
               }
             });
             created++;
-            console.log(`✅ Creado: ${nombre} (ID: ${idServicio}) - Código: ${referralCode}`);
+            console.log(`✅ Creado: ${nombre || servicio} (ID: ${idServicio}) - Código: ${referralCode}`);
           }
         } catch (rowError: any) {
           errors.push(`Error procesando fila: ${rowError.message}`);

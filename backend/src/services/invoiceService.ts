@@ -117,10 +117,11 @@ class InvoiceService {
 
       for (const row of records) {
         try {
-          // Obtener valores - intentar nombres exactos primero, luego búsqueda
+          // Obtener valores del CSV de EAfacturas
+          // Columnas: #Factura, Cliente, Fecha Emisión, ..., Estado, ..., ID Servicio, IP Servicio, Total
           const estado = row['Estado'] || findColumn(row, ['estado', 'status']);
-          const idServicio = row['ID Servicio'] || findColumn(row, ['id servicio', 'servicio']);
-          const factura = row['Factura'] || row['#Factura'] || findColumn(row, ['factura', 'invoice']);
+          const idServicio = row['ID Servicio'] || findColumn(row, ['id servicio', 'servicio', 'ID']);
+          const factura = row['#Factura'] || row['Factura'] || findColumn(row, ['factura', 'invoice']);
           const cliente = row['Cliente'] || findColumn(row, ['cliente', 'client', 'nombre']);
           const fechaEmision = row['Fecha Emisión'] || findColumn(row, ['fecha emision', 'emision']);
           const fechaVencimiento = row['Fecha Vencimiento'] || findColumn(row, ['vencimiento']);
@@ -140,6 +141,7 @@ class InvoiceService {
           const invoiceDate = this.parseDate(fechaEmision);
           const dueDate = this.parseDate(fechaVencimiento);
           // Verificar si está pagada - buscar variaciones
+          // Estados en CSV: "Pagada", "Pendiente de pago", "En Revision", "Cancelada"
           const estadoLower = (estado || '').toLowerCase().trim();
           const isPaid = estadoLower === 'pagada' || 
                         estadoLower === 'pagado' ||
@@ -148,7 +150,8 @@ class InvoiceService {
                         estadoLower === 'pago' ||
                         estadoLower === 'completado' ||
                         estadoLower === 'completed';
-          const status = isPaid ? 'PAID' : 'PENDING';
+          const isEnRevision = estadoLower.includes('revision') || estadoLower.includes('revisión');
+          const status = isPaid ? 'PAID' : isEnRevision ? 'PENDING' : 'PENDING';
           const clientId = String(idServicio).trim();
 
         // Verificar si es cliente referidor
