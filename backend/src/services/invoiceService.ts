@@ -97,6 +97,11 @@ class InvoiceService {
       const findColumn = (row: any, keywords: string[]): string => {
         const keys = Object.keys(row);
         for (const keyword of keywords) {
+          // Buscar coincidencia exacta primero
+          if (row[keyword] !== undefined) {
+            return String(row[keyword]).trim();
+          }
+          // Luego buscar por substring
           const found = keys.find(k => k.toLowerCase().includes(keyword.toLowerCase()));
           if (found && row[found] !== undefined) {
             return String(row[found]).trim();
@@ -105,20 +110,25 @@ class InvoiceService {
         return '';
       };
 
+      // Log de primera fila completa para debug
+      if (records.length > 0) {
+        console.log('🔍 Ejemplo primera fila:', JSON.stringify(records[0], null, 2));
+      }
+
       for (const row of records) {
         try {
-          // Obtener valores buscando por palabras clave en los nombres de columna
-          const estado = findColumn(row, ['estado', 'status', 'Estado']);
-          const idServicio = findColumn(row, ['id servicio', 'id_servicio', 'servicio', 'ID Servicio', 'service']);
-          const factura = findColumn(row, ['factura', 'invoice', '#factura', 'Factura']);
-          const cliente = findColumn(row, ['cliente', 'client', 'nombre', 'Cliente']);
-          const fechaEmision = findColumn(row, ['fecha emisión', 'fecha emision', 'emision', 'emission', 'Fecha Emisión']);
-          const fechaVencimiento = findColumn(row, ['fecha vencimiento', 'vencimiento', 'due', 'Fecha Vencimiento']);
-          const total = findColumn(row, ['total', 'monto', 'amount', 'Total']) || '0';
+          // Obtener valores - intentar nombres exactos primero, luego búsqueda
+          const estado = row['Estado'] || findColumn(row, ['estado', 'status']);
+          const idServicio = row['ID Servicio'] || findColumn(row, ['id servicio', 'servicio']);
+          const factura = row['Factura'] || row['#Factura'] || findColumn(row, ['factura', 'invoice']);
+          const cliente = row['Cliente'] || findColumn(row, ['cliente', 'client', 'nombre']);
+          const fechaEmision = row['Fecha Emisión'] || findColumn(row, ['fecha emision', 'emision']);
+          const fechaVencimiento = row['Fecha Vencimiento'] || findColumn(row, ['vencimiento']);
+          const total = row['Total'] || findColumn(row, ['total', 'monto']) || '0';
 
-          // Log primera fila para debug
+          // Log primera fila procesada para debug
           if (paidCount === 0 && pendingCount === 0 && errors.length === 0) {
-            console.log(`🔍 Primera fila - Estado: "${estado}", ID: "${idServicio}", Total: "${total}"`);
+            console.log(`✅ Primera fila procesada - Estado: "${estado}", ID Servicio: "${idServicio}", Cliente: "${cliente}", Total: "${total}"`);
           }
 
           // Validar campos requeridos
@@ -130,10 +140,10 @@ class InvoiceService {
           const invoiceDate = this.parseDate(fechaEmision);
           const dueDate = this.parseDate(fechaVencimiento);
           // Verificar si está pagada - buscar variaciones
-          const estadoLower = estado.toLowerCase();
+          const estadoLower = (estado || '').toLowerCase();
           const isPaid = estadoLower.includes('pagad') || estadoLower === 'paid' || estadoLower === 'pago';
           const status = isPaid ? 'PAID' : 'PENDING';
-          const clientId = idServicio.trim();
+          const clientId = String(idServicio).trim();
 
         // Verificar si es cliente referidor
         const isReferrer = await prisma.client.findUnique({
