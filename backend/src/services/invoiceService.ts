@@ -48,14 +48,28 @@ class InvoiceService {
 
       // Leer y parsear CSV
       const fileContent = await fs.readFile(data.filePath, 'utf-8');
-      const records: EasyAccessInvoiceRow[] = parse(fileContent, {
+      
+      // Detectar delimitador (tab o coma)
+      const firstLine = fileContent.split('\n')[0];
+      const delimiter = firstLine.includes('\t') ? '\t' : ',';
+      console.log(`📋 Delimitador detectado: ${delimiter === '\t' ? 'TAB' : 'COMA'}`);
+      
+      const records: any[] = parse(fileContent, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-        delimiter: '\t',
+        delimiter: delimiter,
         relax_quotes: true,
         relax_column_count: true,
+        quote: '"',
+        escape: '"',
       });
+
+      // Log de columnas disponibles
+      if (records.length > 0) {
+        const columns = Object.keys(records[0]);
+        console.log(`📋 Columnas encontradas: ${columns.join(', ')}`);
+      }
 
       console.log(`📊 Total de facturas en CSV: ${records.length}\n`);
 
@@ -79,27 +93,45 @@ class InvoiceService {
       let pendingCount = 0;
       const errors: string[] = [];
 
+      // Helper para buscar columna por palabras clave
+      const findColumn = (row: any, keywords: string[]): string => {
+        const keys = Object.keys(row);
+        for (const keyword of keywords) {
+          const found = keys.find(k => k.toLowerCase().includes(keyword.toLowerCase()));
+          if (found && row[found] !== undefined) {
+            return String(row[found]).trim();
+          }
+        }
+        return '';
+      };
+
       for (const row of records) {
         try {
-          // Obtener valores con fallback para diferentes formatos de CSV
-          const estado = row['Estado'] || row['estado'] || '';
-          const idServicio = row['ID Servicio'] || row['ID_Servicio'] || row['id_servicio'] || '';
-          const factura = row['#Factura'] || row['Factura'] || row['factura'] || '';
-          const cliente = row['Cliente'] || row['cliente'] || '';
-          const fechaEmision = row['Fecha Emisión'] || row['Fecha_Emision'] || row['fecha_emision'] || '';
-          const fechaVencimiento = row['Fecha Vencimiento'] || row['Fecha_Vencimiento'] || '';
-          const total = row['Total'] || row['total'] || '0';
+          // Obtener valores buscando por palabras clave en los nombres de columna
+          const estado = findColumn(row, ['estado', 'status', 'Estado']);
+          const idServicio = findColumn(row, ['id servicio', 'id_servicio', 'servicio', 'ID Servicio', 'service']);
+          const factura = findColumn(row, ['factura', 'invoice', '#factura', 'Factura']);
+          const cliente = findColumn(row, ['cliente', 'client', 'nombre', 'Cliente']);
+          const fechaEmision = findColumn(row, ['fecha emisión', 'fecha emision', 'emision', 'emission', 'Fecha Emisión']);
+          const fechaVencimiento = findColumn(row, ['fecha vencimiento', 'vencimiento', 'due', 'Fecha Vencimiento']);
+          const total = findColumn(row, ['total', 'monto', 'amount', 'Total']) || '0';
+
+          // Log primera fila para debug
+          if (paidCount === 0 && pendingCount === 0 && errors.length === 0) {
+            console.log(`🔍 Primera fila - Estado: "${estado}", ID: "${idServicio}", Total: "${total}"`);
+          }
 
           // Validar campos requeridos
           if (!idServicio) {
-            console.log(`⚠️ Factura sin ID Servicio: ${factura || 'N/A'}`);
             errors.push(`Factura ${factura || 'N/A'} sin ID Servicio`);
             continue;
           }
 
           const invoiceDate = this.parseDate(fechaEmision);
           const dueDate = this.parseDate(fechaVencimiento);
-          const isPaid = estado.toLowerCase().includes('pagad') || estado.toLowerCase() === 'paid';
+          // Verificar si está pagada - buscar variaciones
+          const estadoLower = estado.toLowerCase();
+          const isPaid = estadoLower.includes('pagad') || estadoLower === 'paid' || estadoLower === 'pago';
           const status = isPaid ? 'PAID' : 'PENDING';
           const clientId = idServicio.trim();
 
