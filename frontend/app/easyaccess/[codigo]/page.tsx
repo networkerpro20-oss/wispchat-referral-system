@@ -273,12 +273,31 @@ export default function LandingPage() {
 
     // Submit final
     try {
-      const response = await fetch(`${API_URL}/lead/register`, {
+      // Construir dirección completa
+      const direccionCompleta = [
+        formData.calle,
+        formData.numeroExterior ? `#${formData.numeroExterior}` : '',
+        formData.numeroInterior ? `Int. ${formData.numeroInterior}` : '',
+        formData.referencias ? `(${formData.referencias})` : ''
+      ].filter(Boolean).join(' ').trim();
+
+      // Obtener velocidad del plan seleccionado
+      const planSeleccionado = plans.find(p => p.name === formData.planSeleccionado);
+
+      const response = await fetch(`${API_URL}/api/leads/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          referralCode,
-          ...formData
+          codigo: referralCode,
+          nombre: formData.nombre,
+          telefono: formData.telefono,
+          email: formData.email,
+          direccion: direccionCompleta,
+          colonia: formData.colonia,
+          ciudad: formData.ciudad,
+          codigoPostal: formData.codigoPostal,
+          tipoServicio: formData.planSeleccionado,
+          velocidad: planSeleccionado?.speed || null
         })
       });
 
@@ -288,7 +307,7 @@ export default function LandingPage() {
         toast.success('¡Registro exitoso! Nos contactaremos contigo pronto.');
         setCurrentStep(5);
       } else {
-        throw new Error(data.error?.message || 'Error al registrar');
+        throw new Error(data.message || data.error?.message || 'Error al registrar');
       }
     } catch (error: any) {
       console.error('Error submitting form:', error);
