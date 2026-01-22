@@ -710,17 +710,18 @@ class AdminController {
       }, {
         headers: {
           'Content-Type': 'application/json',
-          'X-Tenant-Domain': tenantDomain || 'easyaccessnet.com',
+          'x-tenant-domain': tenantDomain || 'soporte.easyaccessnet.com',
         },
         timeout: 10000,
       });
 
-      if (response.data.success && response.data.data?.token) {
+      // WispChat devuelve accessToken, no token
+      if (response.data.success && response.data.data?.accessToken) {
         res.json({
           success: true,
           message: 'Conexión exitosa con WispChat',
           data: {
-            user: response.data.data.user?.name || response.data.data.user?.email,
+            user: response.data.data.user?.nombre || response.data.data.user?.email,
           },
         });
       } else {
