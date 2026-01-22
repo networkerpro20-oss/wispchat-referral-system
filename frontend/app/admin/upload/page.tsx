@@ -118,10 +118,10 @@ export default function AdminUploadPage() {
       
       let endpoint: string;
       if (uploadType === 'clients') {
-        endpoint = '/api/admin/clients/upload';
+        endpoint = '/admin/clients/upload';
         formData.append('uploadedBy', 'admin');
       } else {
-        endpoint = '/api/admin/invoices/upload';
+        endpoint = '/admin/invoices/upload';
         formData.append('periodStart', periodStart);
         formData.append('periodEnd', periodEnd);
         formData.append('uploadedBy', 'admin');
