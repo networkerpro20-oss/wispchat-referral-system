@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, Loader2, CheckCircle, XCircle, DollarSign, Calendar, Phone, Video } from 'lucide-react';
+import { Save, Loader2, CheckCircle, XCircle, DollarSign, Calendar, Phone, Video, Settings as SettingsIcon, Eye, EyeOff } from 'lucide-react';
 
 import { API_URL } from '@/lib/apiConfig';
 
@@ -29,9 +29,14 @@ interface Settings {
   videoUrl: string | null;
   videoTitle: string | null;
   videoThumbnail: string | null;
+  // WispChat API
+  wispChatUrl: string | null;
+  wispChatTenantDomain: string | null;
+  wispChatAdminEmail: string | null;
+  wispChatAdminPassword: string | null;
 }
 
-type TabType = 'comisiones' | 'promociones' | 'contacto' | 'video';
+type TabType = 'comisiones' | 'promociones' | 'contacto' | 'video' | 'wispchat';
 
 export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState<TabType>('comisiones');
@@ -134,6 +139,7 @@ export default function ConfiguracionPage() {
     { id: 'promociones' as TabType, label: 'Promociones', icon: Calendar },
     { id: 'contacto' as TabType, label: 'Contacto', icon: Phone },
     { id: 'video' as TabType, label: 'Video', icon: Video },
+    { id: 'wispchat' as TabType, label: 'WispChat API', icon: SettingsIcon },
   ];
 
   return (
@@ -520,6 +526,11 @@ export default function ConfiguracionPage() {
               )}
             </div>
           )}
+
+          {/* WispChat API Tab */}
+          {activeTab === 'wispchat' && (
+            <WispChatConfigTab settings={settings} updateField={updateField} />
+          )}
         </div>
       </div>
 
@@ -542,6 +553,180 @@ export default function ConfiguracionPage() {
             </>
           )}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Componente separado para la configuración de WispChat API
+function WispChatConfigTab({ 
+  settings, 
+  updateField 
+}: { 
+  settings: Settings; 
+  updateField: (field: keyof Settings, value: any) => void;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    
+    try {
+      const token = localStorage.getItem('referral_auth_token');
+      const response = await fetch(`${API_URL}/admin/wispchat/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          url: settings.wispChatUrl,
+          tenantDomain: settings.wispChatTenantDomain,
+          email: settings.wispChatAdminEmail,
+          password: settings.wispChatAdminPassword,
+        }),
+      });
+      
+      const data = await response.json();
+      setTestResult({
+        success: data.success,
+        message: data.success ? 'Conexión exitosa con WispChat' : (data.error?.message || 'Error de conexión'),
+      });
+    } catch (error: any) {
+      setTestResult({
+        success: false,
+        message: error.message || 'Error al probar conexión',
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h3 className="font-medium text-blue-900 mb-2">🔗 Integración con WispChat</h3>
+        <p className="text-sm text-blue-800">
+          Configura las credenciales de administrador de WispChat para habilitar la verificación automática 
+          de clientes instalados. La URL apunta al servidor de WispChat (ej: soporte.easyaccessnet.com).
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          URL de WispChat API
+        </label>
+        <input
+          type="url"
+          value={settings.wispChatUrl || ''}
+          onChange={(e) => updateField('wispChatUrl', e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="https://soporte.easyaccessnet.com"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          URL del servidor WispChat (sin /api al final)
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Dominio del Tenant
+        </label>
+        <input
+          type="text"
+          value={settings.wispChatTenantDomain || ''}
+          onChange={(e) => updateField('wispChatTenantDomain', e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="easyaccessnet.com"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Dominio configurado en WispChat para tu empresa
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Email de Administrador
+        </label>
+        <input
+          type="email"
+          value={settings.wispChatAdminEmail || ''}
+          onChange={(e) => updateField('wispChatAdminEmail', e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="admin@easyaccessnet.com"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Email de una cuenta con permisos de administrador en WispChat
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Contraseña
+        </label>
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={settings.wispChatAdminPassword || ''}
+            onChange={(e) => updateField('wispChatAdminPassword', e.target.value)}
+            className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="••••••••"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          La contraseña se almacena de forma segura
+        </p>
+      </div>
+
+      {/* Test Connection Button */}
+      <div className="pt-4 border-t">
+        <button
+          onClick={testConnection}
+          disabled={testing || !settings.wispChatUrl || !settings.wispChatAdminEmail || !settings.wispChatAdminPassword}
+          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {testing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Probando conexión...
+            </>
+          ) : (
+            <>
+              <SettingsIcon className="w-4 h-4" />
+              Probar Conexión
+            </>
+          )}
+        </button>
+
+        {testResult && (
+          <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
+            testResult.success 
+              ? 'bg-green-50 text-green-800 border border-green-200' 
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {testResult.success ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+            <span className="text-sm">{testResult.message}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
+        <h4 className="font-medium text-yellow-900 mb-2">⚠️ Nota Importante</h4>
+        <p className="text-sm text-yellow-800">
+          Si no configuras las credenciales de WispChat, aún podrás marcar leads como "Instalados" 
+          manualmente ingresando el ID del cliente. La verificación automática solo funciona 
+          cuando las credenciales están configuradas correctamente.
+        </p>
       </div>
     </div>
   );

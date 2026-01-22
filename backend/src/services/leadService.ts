@@ -126,7 +126,10 @@ class LeadService {
 
   /**
    * Actualizar estado del lead
-   * Si se marca como INSTALLED, verificar en WispChat automáticamente
+   * Si se marca como INSTALLED:
+   * - Intenta verificar en WispChat automáticamente
+   * - Si no encuentra pero se proporciona wispChatClientId manual, lo acepta
+   * - Genera comisión de instalación
    */
   async updateStatus(
     id: string,
@@ -135,6 +138,7 @@ class LeadService {
       fechaContacto?: Date;
       fechaInstalacion?: Date;
       notas?: string;
+      wispChatClientId?: string; // ID manual del cliente en WispChat
     }
   ): Promise<Referral> {
     const referral = await this.getById(id);
@@ -146,31 +150,50 @@ class LeadService {
     if (data?.fechaInstalacion) updateData.fechaInstalacion = data.fechaInstalacion;
     if (data?.notas) updateData.notas = data.notas;
 
-    // Si se marca como INSTALLED, verificar en WispChat
+    // Si se marca como INSTALLED
     if (status === 'INSTALLED') {
+      let foundWispChatClientId: string | null = null;
+      
+      // Primero, intentar verificación automática en WispChat
       console.log(`🔍 Verificando referido en WispChat: ${referral.nombre}`);
       
-      const wispChatClient = await wispChatService.findClientByEmailOrPhone(
-        referral.email || undefined,
-        referral.telefono
-      );
-
-      if (wispChatClient) {
-        console.log(`✅ Referido encontrado en WispChat: ${wispChatClient.clientNumber}`);
-        updateData.wispChatClientId = wispChatClient.id;
-        
-        if (!data?.fechaInstalacion) {
-          updateData.fechaInstalacion = new Date();
-        }
-
-        // Generar comisión de instalación
-        await this.generateInstallationCommission(referral, wispChatClient.id);
-      } else {
-        console.log(`⚠️  Referido NO encontrado en WispChat - verificar manualmente`);
-        throw new Error(
-          'Referido no encontrado en WispChat. Verificar que el email/teléfono coincidan con el registro en el sistema.'
+      try {
+        const wispChatClient = await wispChatService.findClientByEmailOrPhone(
+          referral.email || undefined,
+          referral.telefono
         );
+
+        if (wispChatClient) {
+          console.log(`✅ Referido encontrado en WispChat: ${wispChatClient.clientNumber}`);
+          foundWispChatClientId = wispChatClient.id;
+        }
+      } catch (error: any) {
+        console.log(`⚠️  Error buscando en WispChat: ${error.message}`);
       }
+
+      // Si no se encontró automáticamente, verificar si se proporcionó ID manual
+      if (!foundWispChatClientId && data?.wispChatClientId) {
+        console.log(`📝 Usando ID de WispChat proporcionado manualmente: ${data.wispChatClientId}`);
+        foundWispChatClientId = data.wispChatClientId;
+      }
+
+      // Si no hay ID de ninguna forma, permitir continuar sin ID (instalación manual sin vincular)
+      if (!foundWispChatClientId) {
+        console.log(`⚠️  Instalación sin ID de WispChat - se puede vincular después`);
+        // NO lanzar error, permitir marcar como instalado sin wispChatClientId
+      }
+
+      // Asignar wispChatClientId si existe
+      if (foundWispChatClientId) {
+        updateData.wispChatClientId = foundWispChatClientId;
+      }
+      
+      if (!data?.fechaInstalacion) {
+        updateData.fechaInstalacion = new Date();
+      }
+
+      // Generar comisión de instalación (siempre al marcar como INSTALLED)
+      await this.generateInstallationCommission(referral, foundWispChatClientId || 'MANUAL');
     }
 
     const updated = await prisma.referral.update({
@@ -191,6 +214,19 @@ class LeadService {
    * Generar comisión de instalación
    */
   private async generateInstallationCommission(referral: Referral, wispChatClientId: string) {
+    // Verificar que no exista ya una comisión de instalación
+    const existingCommission = await prisma.commission.findFirst({
+      where: {
+        referralId: referral.id,
+        type: 'INSTALLATION',
+      },
+    });
+
+    if (existingCommission) {
+      console.log(`⏭️  Ya existe comisión de instalación para ${referral.nombre}`);
+      return existingCommission;
+    }
+
     const settings = await prisma.settings.findFirst();
     const amount = settings?.installationAmount || 500;
 

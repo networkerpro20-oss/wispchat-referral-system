@@ -101,4 +101,10 @@ router.post('/commissions/:id/apply', adminController.applyCommission);
  */
 router.post('/commissions/:id/cancel', adminController.cancelCommission);
 
+/**
+ * POST /api/admin/wispchat/test
+ * Probar conexión con WispChat API
+ */
+router.post('/wispchat/test', adminController.testWispChatConnection);
+
 export default router;

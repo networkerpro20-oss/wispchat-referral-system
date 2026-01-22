@@ -144,17 +144,26 @@ class ClientImportService {
             created++;
             console.log(`✅ Creado: ${nombre || servicio} (ID: ${idServicio}) - Código: ${referralCode}`);
           }
+          
+          // === DETECCIÓN DE LEADS QUE YA SON CLIENTES ===
+          // Buscar si existe un lead/referido pendiente con este teléfono o email
+          await this.matchAndInstallReferral(idServicio, telefono, email, nombre || servicio);
+          
         } catch (rowError: any) {
           errors.push(`Error procesando fila: ${rowError.message}`);
           skipped++;
         }
       }
 
+      // Contar cuántos leads fueron vinculados
+      const linkedLeads = await this.countLinkedLeads();
+
       console.log(`\n${'='.repeat(60)}`);
       console.log(`✅ IMPORTACIÓN COMPLETADA`);
       console.log(`📥 Creados: ${created}`);
       console.log(`🔄 Actualizados: ${updated}`);
       console.log(`⏭️ Omitidos: ${skipped}`);
+      console.log(`🔗 Leads vinculados: ${linkedLeads.recentlyLinked}`);
       if (errors.length > 0) {
         console.log(`❌ Errores: ${errors.length}`);
       }
@@ -167,6 +176,7 @@ class ClientImportService {
           created,
           updated,
           skipped,
+          leadsLinked: linkedLeads.recentlyLinked,
           errors: errors.slice(0, 10), // Máximo 10 errores en respuesta
         }
       };
@@ -174,6 +184,112 @@ class ClientImportService {
       console.error('❌ Error importando clientes:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Buscar y vincular un lead pendiente con el nuevo cliente
+   */
+  private async matchAndInstallReferral(
+    wispChatClientId: string, 
+    telefono?: string, 
+    email?: string,
+    nombre?: string
+  ) {
+    if (!telefono && !email) return;
+
+    try {
+      // Buscar lead pendiente que coincida
+      const conditions: any[] = [];
+      if (telefono) {
+        // Normalizar teléfono (quitar espacios, guiones, etc)
+        const normalizedPhone = telefono.replace(/\D/g, '');
+        conditions.push({ telefono: { contains: normalizedPhone.slice(-10) } });
+      }
+      if (email) {
+        conditions.push({ email: { equals: email, mode: 'insensitive' } });
+      }
+
+      const matchingReferral = await prisma.referral.findFirst({
+        where: {
+          OR: conditions,
+          status: { in: ['PENDING', 'CONTACTED'] },
+          wispChatClientId: null, // No vinculado aún
+        },
+        include: {
+          client: true,
+        },
+      });
+
+      if (matchingReferral) {
+        console.log(`🔗 Lead encontrado! "${matchingReferral.nombre}" coincide con cliente ${wispChatClientId}`);
+
+        // Actualizar el lead como INSTALLED
+        await prisma.referral.update({
+          where: { id: matchingReferral.id },
+          data: {
+            wispChatClientId: wispChatClientId,
+            status: 'INSTALLED',
+            fechaInstalacion: new Date(),
+            notas: `${matchingReferral.notas || ''}\n[${new Date().toISOString()}] Vinculado automáticamente al importar CSV de clientes`,
+          },
+        });
+
+        // Verificar si ya tiene comisión de instalación
+        const existingCommission = await prisma.commission.findFirst({
+          where: {
+            referralId: matchingReferral.id,
+            type: 'INSTALLATION',
+          },
+        });
+
+        if (!existingCommission) {
+          // Generar comisión de instalación
+          const settings = await prisma.settings.findFirst();
+          const amount = settings?.installationAmount || 200;
+
+          await prisma.commission.create({
+            data: {
+              clientId: matchingReferral.clientId,
+              referralId: matchingReferral.id,
+              type: 'INSTALLATION',
+              amount,
+              status: 'EARNED',
+            },
+          });
+
+          // Actualizar stats del cliente referidor
+          await prisma.client.update({
+            where: { id: matchingReferral.clientId },
+            data: {
+              totalReferrals: { increment: 1 },
+              totalEarned: { increment: Number(amount) },
+            },
+          });
+
+          console.log(`💰 Comisión de instalación generada: $${amount} para ${matchingReferral.client.nombre}`);
+        }
+      }
+    } catch (error: any) {
+      console.error(`⚠️  Error vinculando lead: ${error.message}`);
+    }
+  }
+
+  /**
+   * Contar leads vinculados recientemente (últimas 24 horas)
+   */
+  private async countLinkedLeads() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const recentlyLinked = await prisma.referral.count({
+      where: {
+        status: 'INSTALLED',
+        fechaInstalacion: { gte: yesterday },
+        wispChatClientId: { not: null },
+      },
+    });
+
+    return { recentlyLinked };
   }
 
   /**

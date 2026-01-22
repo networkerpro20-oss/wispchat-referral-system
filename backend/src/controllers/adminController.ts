@@ -426,9 +426,12 @@ class AdminController {
   async updateLeadStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, notas } = req.body;
+      const { status, notas, wispChatClientId } = req.body;
 
-      const referral = await leadService.updateStatus(id, status, { notas });
+      const referral = await leadService.updateStatus(id, status, { 
+        notas,
+        wispChatClientId, // Permitir ID manual
+      });
 
       res.json({
         success: true,
@@ -680,6 +683,59 @@ class AdminController {
       res.status(500).json({
         success: false,
         error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * Probar conexión con WispChat API
+   * POST /api/admin/wispchat/test
+   */
+  async testWispChatConnection(req: Request, res: Response) {
+    try {
+      const { url, tenantDomain, email, password } = req.body;
+
+      if (!url || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Faltan campos requeridos: url, email, password' },
+        });
+      }
+
+      // Intentar login en WispChat
+      const axios = require('axios');
+      const response = await axios.post(`${url}/api/v1/auth/login`, {
+        email,
+        password,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Domain': tenantDomain || 'easyaccessnet.com',
+        },
+        timeout: 10000,
+      });
+
+      if (response.data.success && response.data.data?.token) {
+        res.json({
+          success: true,
+          message: 'Conexión exitosa con WispChat',
+          data: {
+            user: response.data.data.user?.name || response.data.data.user?.email,
+          },
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: { message: 'Credenciales inválidas o respuesta inesperada' },
+        });
+      }
+    } catch (error: any) {
+      console.error('Error testing WispChat connection:', error.message);
+      res.status(400).json({
+        success: false,
+        error: { 
+          message: error.response?.data?.message || error.message || 'Error de conexión con WispChat',
+        },
       });
     }
   }

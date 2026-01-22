@@ -78,6 +78,8 @@ export default function LeadDetailPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [manualClientId, setManualClientId] = useState('');
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const [editForm, setEditForm] = useState({
     status: '',
     notas: ''
@@ -119,7 +121,7 @@ export default function LeadDetailPage() {
     }
   };
 
-  const updateStatus = async (newStatus: string) => {
+  const updateStatus = async (newStatus: string, wispChatClientId?: string) => {
     try {
       setSaving(true);
       const token = localStorage.getItem('referral_auth_token');
@@ -132,17 +134,20 @@ export default function LeadDetailPage() {
         },
         body: JSON.stringify({ 
           status: newStatus,
-          notas: newNote || undefined
+          notas: newNote || undefined,
+          wispChatClientId: wispChatClientId || undefined
         })
       });
       
       if (response.ok) {
         await loadLead();
         setNewNote('');
+        setManualClientId('');
+        setShowInstallModal(false);
         alert('Estado actualizado correctamente');
       } else {
         const error = await response.json();
-        alert(`Error: ${error.message || 'No se pudo actualizar'}`);
+        alert(`Error: ${error.error?.message || error.message || 'No se pudo actualizar'}`);
       }
     } catch (error) {
       console.error('Error updating status:', error);
@@ -150,6 +155,19 @@ export default function LeadDetailPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleStatusClick = (status: string) => {
+    if (status === 'INSTALLED' && lead?.status !== 'INSTALLED') {
+      // Mostrar modal para ingresar ID opcional
+      setShowInstallModal(true);
+    } else {
+      updateStatus(status);
+    }
+  };
+
+  const confirmInstall = () => {
+    updateStatus('INSTALLED', manualClientId || undefined);
   };
 
   const addNote = async () => {
@@ -522,7 +540,7 @@ export default function LeadDetailPage() {
                   return (
                     <button
                       key={status}
-                      onClick={() => updateStatus(status)}
+                      onClick={() => handleStatusClick(status)}
                       disabled={saving || isActive}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors ${
                         isActive 
@@ -537,7 +555,62 @@ export default function LeadDetailPage() {
                   );
                 })}
               </div>
+              
+              {/* Mostrar wispChatClientId si existe */}
+              {lead.wispChatClientId && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>ID WispChat:</strong> {lead.wispChatClientId}
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* Modal para Instalación */}
+            {showInstallModal && (
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Instalación</h3>
+                
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-yellow-800">
+                    El sistema intentará buscar automáticamente al cliente en WispChat por email/teléfono. 
+                    Si no lo encuentra, puedes ingresar el ID manualmente (opcional).
+                  </p>
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ID del Cliente en WispChat (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={manualClientId}
+                    onChange={(e) => setManualClientId(e.target.value)}
+                    placeholder="Ej: 123 o WISPHUB_123"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si no lo ingresas, se generará la comisión y podrás vincularlo después
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowInstallModal(false)}
+                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmInstall}
+                    disabled={saving}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Procesando...' : 'Confirmar Instalación'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Comisiones */}
             {lead.commissions?.length > 0 && (

@@ -67,6 +67,12 @@ class SettingsController {
         videoUrl,
         videoTitle,
         videoThumbnail,
+        
+        // WispChat API
+        wispChatUrl,
+        wispChatTenantDomain,
+        wispChatAdminEmail,
+        wispChatAdminPassword,
       } = req.body;
       
       // Validaciones
@@ -157,6 +163,12 @@ class SettingsController {
           ...(videoUrl !== undefined && { videoUrl }),
           ...(videoTitle !== undefined && { videoTitle }),
           ...(videoThumbnail !== undefined && { videoThumbnail }),
+          
+          // WispChat API
+          ...(wispChatUrl !== undefined && { wispChatUrl }),
+          ...(wispChatTenantDomain !== undefined && { wispChatTenantDomain }),
+          ...(wispChatAdminEmail !== undefined && { wispChatAdminEmail }),
+          ...(wispChatAdminPassword !== undefined && { wispChatAdminPassword }),
         }
       });
       
