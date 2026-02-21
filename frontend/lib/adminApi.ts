@@ -2,7 +2,7 @@
  * API client para llamadas autenticadas del admin
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { API_URL } from './apiConfig';
 
 /**
  * Obtener token de autenticación
