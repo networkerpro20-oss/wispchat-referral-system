@@ -405,14 +405,14 @@ function CommissionCard({ commission: c, onApply, onCancel, onActivate }: Commis
               </div>
             )}
 
-            {!c.client.isPaymentCurrent && c.status === 'EARNED' && (
+            {c.status === 'EARNED' && (
               <div className="mt-2">
                 <button
                   onClick={() => onActivate(c.client.id, c.client.nombre)}
                   className="text-xs text-blue-700 hover:text-blue-900 underline flex items-center gap-1"
                 >
                   <Zap className="w-3 h-3" />
-                  Activar comisiones del cliente
+                  Activar comisión (pasar a Activa)
                 </button>
               </div>
             )}
@@ -501,8 +501,9 @@ export default function AdminCommissionsPage() {
   const router = useRouter();
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [activeTab, setActiveTab] = useState<CommissionStatus | 'ALL'>('ACTIVE');
+  const [activeTab, setActiveTab] = useState<CommissionStatus | 'ALL'>('ALL');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Modals
@@ -524,6 +525,7 @@ export default function AdminCommissionsPage() {
 
   const loadCommissions = useCallback(async (tab: CommissionStatus | 'ALL') => {
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await adminApi.getCommissions(
         tab !== 'ALL' ? { status: tab } : undefined
@@ -531,9 +533,11 @@ export default function AdminCommissionsPage() {
       if (result.success) {
         setCommissions(result.data.commissions);
         setPagination(result.data.pagination);
+      } else {
+        setLoadError(result.error?.message || 'Error al cargar comisiones');
       }
-    } catch {
-      showToast('error', 'Error al cargar comisiones');
+    } catch (err: any) {
+      setLoadError(err.message || 'No se pudo conectar con el servidor');
     } finally {
       setLoading(false);
     }
@@ -541,14 +545,16 @@ export default function AdminCommissionsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      // Load counts for all statuses in parallel
       const statuses: CommissionStatus[] = ['ACTIVE', 'EARNED', 'APPLIED', 'CANCELLED'];
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         statuses.map(s => adminApi.getCommissions({ status: s }))
       );
       const newStats: Record<string, number> = {};
       statuses.forEach((s, i) => {
-        if (results[i].success) newStats[s] = results[i].data.pagination.total;
+        const r = results[i];
+        if (r.status === 'fulfilled' && r.value?.success) {
+          newStats[s] = r.value.data.pagination.total;
+        }
       });
       setStats(newStats);
     } catch {
@@ -674,15 +680,37 @@ export default function AdminCommissionsPage() {
               <p className="text-gray-500">Cargando comisiones...</p>
             </div>
           </div>
+        ) : loadError ? (
+          <div className="bg-white rounded-2xl border border-red-200 shadow-sm py-16 text-center">
+            <AlertCircle className="w-12 h-12 text-red-300 mx-auto mb-3" />
+            <p className="text-red-600 font-medium">Error al cargar comisiones</p>
+            <p className="text-gray-400 text-sm mt-1 max-w-sm mx-auto">{loadError}</p>
+            <button
+              onClick={() => loadCommissions(activeTab)}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              Reintentar
+            </button>
+          </div>
         ) : commissions.length === 0 ? (
           <div className="bg-white rounded-2xl border shadow-sm py-20 text-center">
             <DollarSign className="w-12 h-12 text-gray-200 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">No hay comisiones en este estado</p>
             <p className="text-gray-400 text-sm mt-1">
               {activeTab === 'ACTIVE'
-                ? 'Las comisiones activas aparecerán al procesar el CSV de facturas'
-                : 'Prueba seleccionando otra pestaña'}
+                ? 'Las comisiones activas requieren que el referido haya pagado Y el cliente esté al día. Revisa la pestaña "En espera".'
+                : activeTab === 'ALL'
+                ? 'Aún no hay comisiones registradas. Se generan al procesar el CSV de facturas o manualmente.'
+                : 'No hay comisiones con este estado.'}
             </p>
+            {activeTab === 'ACTIVE' && (
+              <button
+                onClick={() => setActiveTab('EARNED')}
+                className="mt-4 px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600"
+              >
+                Ver comisiones en espera
+              </button>
+            )}
           </div>
         ) : (
           <>

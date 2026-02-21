@@ -36,13 +36,21 @@ class CommissionService {
     const settings = await prisma.settings.findFirst();
     const amount = settings?.installationAmount || new Decimal(500);
 
+    // Si el cliente referidor está al día → ACTIVE, si no → EARNED
+    const clientIsPaymentCurrent = referral.client.isPaymentCurrent;
+    const status = clientIsPaymentCurrent ? 'ACTIVE' : 'EARNED';
+    const statusReason = clientIsPaymentCurrent
+      ? null
+      : 'Cliente referidor no está al día con sus pagos';
+
     const commission = await prisma.commission.create({
       data: {
         clientId: referral.clientId,
         referralId,
         type: 'INSTALLATION',
         amount,
-        status: 'EARNED',
+        status,
+        statusReason,
       },
     });
 
