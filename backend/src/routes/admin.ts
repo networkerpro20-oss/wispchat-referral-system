@@ -90,6 +90,26 @@ router.post('/invoices/uploads/:id/reprocess', adminController.reprocessUpload);
 router.get('/commissions/active', adminController.getActiveCommissions);
 
 /**
+ * GET /api/admin/commissions
+ * Listar todas las comisiones con filtros opcionales (?status=ACTIVE&type=MONTHLY&clientId=...)
+ */
+router.get('/commissions', adminController.getAllCommissions);
+
+/**
+ * POST /api/admin/commissions/generate/installation
+ * Generar comisión de instalación manualmente para un referido
+ * Body: { referralId }
+ */
+router.post('/commissions/generate/installation', adminController.generateInstallationCommission);
+
+/**
+ * POST /api/admin/commissions/generate/monthly
+ * Generar comisión mensual manualmente para un referido
+ * Body: { referralId, monthNumber, monthDate }
+ */
+router.post('/commissions/generate/monthly', adminController.generateMonthlyCommission);
+
+/**
  * POST /api/admin/commissions/:id/apply
  * Aplicar comisión a factura del cliente
  */
@@ -100,6 +120,12 @@ router.post('/commissions/:id/apply', adminController.applyCommission);
  * Cancelar comisión
  */
 router.post('/commissions/:id/cancel', adminController.cancelCommission);
+
+/**
+ * POST /api/admin/clients/:id/activate-commissions
+ * Activar comisiones EARNED → ACTIVE para un cliente (cuando pone su pago al día)
+ */
+router.post('/clients/:id/activate-commissions', adminController.activateClientCommissions);
 
 /**
  * POST /api/admin/wispchat/test

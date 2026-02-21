@@ -130,6 +130,21 @@ export const adminApi = {
   },
 
   /**
+   * GET /admin/commissions
+   * Listar todas las comisiones (con filtros opcionales)
+   */
+  async getCommissions(filters?: { status?: string; type?: string; clientId?: string; page?: number }) {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.clientId) params.append('clientId', filters.clientId);
+    if (filters?.page) params.append('page', String(filters.page));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await authenticatedFetch(`/admin/commissions${query}`);
+    return response.json();
+  },
+
+  /**
    * GET /admin/commissions/active
    */
   async getActiveCommissions() {
@@ -139,10 +154,22 @@ export const adminApi = {
 
   /**
    * POST /admin/commissions/:id/apply
+   * Aplica comisión a factura del cliente - requiere datos de la factura
    */
-  async applyCommission(commissionId: string) {
+  async applyCommission(
+    commissionId: string,
+    data: {
+      wispChatInvoiceId: string;
+      invoiceMonth: string;
+      invoiceAmount: number;
+      appliedBy: string;
+      amount?: number;
+      notas?: string;
+    }
+  ) {
     const response = await authenticatedFetch(`/admin/commissions/${commissionId}/apply`, {
       method: 'POST',
+      body: JSON.stringify(data),
     });
     return response.json();
   },
@@ -150,8 +177,44 @@ export const adminApi = {
   /**
    * POST /admin/commissions/:id/cancel
    */
-  async cancelCommission(commissionId: string) {
+  async cancelCommission(commissionId: string, reason: string) {
     const response = await authenticatedFetch(`/admin/commissions/${commissionId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return response.json();
+  },
+
+  /**
+   * POST /admin/commissions/generate/installation
+   * Genera comisión de instalación manualmente para un referido INSTALLED
+   */
+  async generateInstallationCommission(referralId: string) {
+    const response = await authenticatedFetch('/admin/commissions/generate/installation', {
+      method: 'POST',
+      body: JSON.stringify({ referralId }),
+    });
+    return response.json();
+  },
+
+  /**
+   * POST /admin/commissions/generate/monthly
+   * Genera comisión mensual manualmente
+   */
+  async generateMonthlyCommission(referralId: string, monthNumber: number, monthDate: string) {
+    const response = await authenticatedFetch('/admin/commissions/generate/monthly', {
+      method: 'POST',
+      body: JSON.stringify({ referralId, monthNumber, monthDate }),
+    });
+    return response.json();
+  },
+
+  /**
+   * POST /admin/clients/:id/activate-commissions
+   * Activa comisiones EARNED → ACTIVE cuando el cliente paga
+   */
+  async activateClientCommissions(clientId: string) {
+    const response = await authenticatedFetch(`/admin/clients/${clientId}/activate-commissions`, {
       method: 'POST',
     });
     return response.json();

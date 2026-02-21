@@ -122,6 +122,11 @@ export default function AdminLayout({
       icon: Users,
     },
     {
+      href: '/admin/commissions',
+      label: 'Comisiones',
+      icon: DollarSign,
+    },
+    {
       href: '/admin/upload',
       label: 'Subir CSV',
       icon: Upload,

@@ -688,6 +688,175 @@ class AdminController {
   }
 
   /**
+   * Listar todas las comisiones con filtros
+   * GET /api/admin/commissions
+   */
+  async getAllCommissions(req: Request, res: Response) {
+    try {
+      const { status, type, clientId, page, limit } = req.query;
+      const pageNum = page ? parseInt(page as string) : 1;
+      const limitNum = limit ? parseInt(limit as string) : 50;
+      const skip = (pageNum - 1) * limitNum;
+
+      const where: any = {};
+      if (status) where.status = status;
+      if (type) where.type = type;
+      if (clientId) where.clientId = clientId as string;
+
+      const [commissions, total] = await Promise.all([
+        prisma.commission.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limitNum,
+          include: {
+            client: {
+              select: {
+                id: true,
+                nombre: true,
+                email: true,
+                wispChatClientId: true,
+                isPaymentCurrent: true,
+              },
+            },
+            referral: {
+              select: {
+                id: true,
+                nombre: true,
+                telefono: true,
+                wispChatClientId: true,
+                status: true,
+              },
+            },
+            applications: {
+              select: {
+                id: true,
+                amount: true,
+                appliedAt: true,
+                invoiceMonth: true,
+                appliedBy: true,
+                wispChatInvoiceId: true,
+              },
+            },
+          },
+        }),
+        prisma.commission.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          commissions: commissions.map(c => ({
+            ...c,
+            amount: Number(c.amount),
+            applications: c.applications.map(a => ({ ...a, amount: Number(a.amount) })),
+          })),
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages: Math.ceil(total / limitNum),
+          },
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Generar comisión de instalación manualmente
+   * POST /api/admin/commissions/generate/installation
+   * Body: { referralId }
+   */
+  async generateInstallationCommission(req: Request, res: Response) {
+    try {
+      const { referralId } = req.body;
+
+      if (!referralId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'referralId es requerido' },
+        });
+      }
+
+      const commission = await commissionService.generateInstallationCommission(referralId);
+
+      res.json({
+        success: true,
+        data: { ...commission, amount: Number(commission.amount) },
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Generar comisión mensual manualmente
+   * POST /api/admin/commissions/generate/monthly
+   * Body: { referralId, monthNumber, monthDate }
+   */
+  async generateMonthlyCommission(req: Request, res: Response) {
+    try {
+      const { referralId, monthNumber, monthDate } = req.body;
+
+      if (!referralId || !monthNumber || !monthDate) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'referralId, monthNumber y monthDate son requeridos' },
+        });
+      }
+
+      const commission = await commissionService.generateMonthlyCommission(
+        referralId,
+        parseInt(monthNumber),
+        new Date(monthDate)
+      );
+
+      res.json({
+        success: true,
+        data: { ...commission, amount: Number(commission.amount) },
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * Activar comisiones EARNED → ACTIVE para un cliente
+   * POST /api/admin/clients/:id/activate-commissions
+   */
+  async activateClientCommissions(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const client = await prisma.client.findUnique({ where: { id } });
+      if (!client) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Cliente no encontrado' },
+        });
+      }
+
+      const activated = await invoiceService.activatePendingCommissions(id);
+
+      res.json({
+        success: true,
+        data: {
+          clientId: id,
+          clientNombre: client.nombre,
+          commissionsActivated: activated,
+          message: activated > 0
+            ? `${activated} comisión(es) activada(s) correctamente`
+            : 'No había comisiones pendientes de activar',
+        },
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
    * Probar conexión con WispChat API
    * POST /api/admin/wispchat/test
    */
