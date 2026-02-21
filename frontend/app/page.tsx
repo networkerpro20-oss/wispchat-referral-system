@@ -11,7 +11,7 @@ export default function HomePage() {
               Easy Access NewTelecom
             </div>
             <Link
-              href="/dashboard"
+              href="/cliente/dashboard"
               className="px-6 py-2.5 bg-white text-purple-700 rounded-full font-bold hover:scale-110 hover:shadow-2xl transition-all duration-300 shadow-lg"
             >
               Ingresar
@@ -272,7 +272,7 @@ export default function HomePage() {
                 </p>
               </div>
               <Link
-                href="/dashboard"
+                href="/cliente/dashboard"
                 className="inline-block px-16 py-6 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white text-2xl md:text-3xl font-black rounded-full hover:scale-110 hover:shadow-2xl transition-all duration-300 shadow-xl transform hover:-translate-y-2"
               >
                 Obtener Mi Enlace Ahora
